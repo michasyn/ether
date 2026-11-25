@@ -273,7 +273,7 @@
         { from: [16, 4], to: [4, 10], mode: "hold" }
       ],
       shards: {}
-    }
+    },
   // --- LEVEL 11 ---
     {
       name: "Eisige Präzision",
