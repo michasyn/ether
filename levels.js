@@ -274,5 +274,295 @@
       ],
       shards: {}
     }
+  // --- LEVEL 11 ---
+    {
+      name: "Eisige Präzision",
+      par: 45,
+      hint: "Nutze die Rubinfelder zum Abbremsen, bevor dich das Kristalleis ins Wasser oder in die Sternenkluft trägt.",
+      grid: [
+        "####################",
+        "#O..iiii~~~~iiii..O#",
+        "#...iiii~~~~iiii...#",
+        "#...r..i~~~~i..r...#",
+        "#..###.i....i.###..#",
+        "#O.....i.rr.i.....O#",
+        "#..S...i.rr.i......#",
+        "#O.....i.rr.i.....O#",
+        "#..###.i....i.###..#",
+        "#...r..iaaaai..r...#",
+        "#...iiiiaaaaiiii...#",
+        "#O..iiiiaaaaiiii..O#",
+        "####################"
+      ],
+      links: [],
+      shards: {}
+    },
+
+    // --- LEVEL 12 ---
+    {
+      name: "Die drei Schleusen",
+      par: 65,
+      hint: "Das Impuls-Terminal schaltet zwei Schleusen gleichzeitig. Schiebe die Stasis-Quader auf die Sensor-Platten.",
+      grid: [
+        "####################",
+        "#O..#....O.....#..O#",
+        "#...D..........D...#",
+        "#...#..T....P..#...#",
+        "#...####....####...#",
+        "#........~~........#",
+        "#..S..B..~~..B..O..#",
+        "#........~~........#",
+        "#...####....####...#",
+        "#...#....P.....#...#",
+        "#...D..........D...#",
+        "#O..#..O....O..#..O#",
+        "####################"
+      ],
+      links: [
+        { from: [7, 3], to: [4, 2], mode: "toggle" },
+        { from: [7, 3], to: [15, 10], mode: "toggle" },
+        { from: [12, 3], to: [15, 2], mode: "hold" },
+        { from: [9, 9], to: [4, 10], mode: "hold" }
+      ],
+      shards: {}
+    },
+
+    // --- LEVEL 13 ---
+    {
+      name: "Spiegelkabinett",
+      par: 70,
+      hint: "Lenke den Laser über die Prismen-Spiegel wahlweise auf den rechten oder den unteren Empfänger, um die Schleusen zu öffnen.",
+      grid: [
+        "####################",
+        "#O..#..L....M..#..O#",
+        "#...D..........D...#",
+        "#...#..........#...#",
+        "#...#..M....M..R...#",
+        "#...#..........#...#",
+        "#..O...S....2...O..#",
+        "#...#..........#...#",
+        "#...#..M....R..#...#",
+        "#...#..........#...#",
+        "#...D..........D...#",
+        "#O..#..O....O..#..O#",
+        "####################"
+      ],
+      lasers: {
+        "7,1": { dir: "E", active: true }
+      },
+      mirrors: {
+        "12,1": "/",
+        "12,4": "/",
+        "7,4": "\\",
+        "7,8": "/"
+      },
+      links: [
+        { from: [15, 4], to: [4, 10], mode: "hold" },
+        { from: [15, 4], to: [15, 10], mode: "hold" },
+        { from: [12, 8], to: [4, 2], mode: "hold" },
+        { from: [12, 8], to: [15, 2], mode: "hold" }
+      ],
+      shards: {}
+    },
+
+    // --- LEVEL 14 ---
+    {
+      name: "Abstoßung & Sog",
+      par: 60,
+      hint: "Violette Kerne ziehen dich an, bernsteinfarbene stoßen dich ab. Nutze die schmalen Rubinbrücken über die Sternenkluft.",
+      grid: [
+        "####################",
+        "#O..ii...a...ii..O.#",
+        "#..iii.G.a.X.iii...#",
+        "#...ii...a...ii....#",
+        "#....rrrr.rrrr.....#",
+        "#..O.....a.....O...#",
+        "#..S..X..r..G...2..#",
+        "#..O.....a.....O...#",
+        "#....rrrr.rrrr.....#",
+        "#...ii...a...ii....#",
+        "#..iii.X.a.G.iii.E.#",
+        "#O..ii...a...ii..O.#",
+        "####################"
+      ],
+      links: [],
+      shards: {}
+    },
+
+    // --- LEVEL 15 ---
+    {
+      name: "Sprengmeister",
+      par: 65,
+      hint: "Sammle die Puls-Ladungen und sprenge alle vier rissigen Kammern auf. Ein Phasen-Tauscher und eine Extra-Kugel warten im Sektor.",
+      grid: [
+        "####################",
+        "#O..#.O..O.....#..O#",
+        "#...C..........C...#",
+        "#...#..1....1..#...#",
+        "#..###........###..#",
+        "#........##........#",
+        "#..S..3..##..W..O..#",
+        "#........##........#",
+        "#..###........###..#",
+        "#...#..1....1..#...#",
+        "#...C..........C...#",
+        "#O..#..E....O..#..O#",
+        "####################"
+      ],
+      links: [],
+      shards: {
+        "6,6": "Tipp: Lege die Puls-Ladung (⚡) direkt vor der rissigen Wand ab und rolle schnell ein Stück zurück."
+      }
+    },
+
+    // --- LEVEL 16 ---
+    {
+      name: "Phasen-Tausch",
+      par: 65,
+      hint: "Baue mit dem Stasis-Quader eine Lichtbrücke über den Wasserkanal und räume die Eckkammern mit den Phasen-Tauschern frei.",
+      grid: [
+        "####################",
+        "#O..#....~..O..#..O#",
+        "#...W....~.....W...#",
+        "#...#....~.....#...#",
+        "#...#..B.~.O...#...#",
+        "#...###..~...###...#",
+        "#..S.....~......O..#",
+        "#...###..~...###...#",
+        "#...#..O.~.B...#...#",
+        "#...#....~.....#...#",
+        "#...W....~.....W...#",
+        "#O..#....~.....#..O#",
+        "####################"
+      ],
+      links: [],
+      shards: {}
+    },
+
+    // --- LEVEL 17 (DUAL) ---
+    {
+      name: "Doppel-Resonanz (Dual)",
+      par: 75,
+      hint: "Blau und Gold halten sich gegenseitig die Sensor-Platten gedrückt, um die unteren Kammern und farbigen Phasen-Tore zu erreichen.",
+      grid: [
+        "####################",
+        "#O..#..........#..O#",
+        "#...b..........g...#",
+        "#...#..S....K..#...#",
+        "#..P#..........#P..#",
+        "#####..........#####",
+        "#..O............O..#",
+        "#...####D##D####...#",
+        "#...#....##....#...#",
+        "#...#..O.##.O..#...#",
+        "#...b..........g...#",
+        "#O..#....##....#..O#",
+        "####################"
+      ],
+      links: [
+        { from: [3, 4], to: [11, 7], mode: "hold" },
+        { from: [16, 4], to: [8, 7], mode: "hold" }
+      ],
+      shards: {}
+    },
+
+    // --- LEVEL 18 ---
+    {
+      name: "Laser-Sektor",
+      par: 70,
+      hint: "Aktiviere den Laser über das Impuls-Terminal. Richte die beiden Spiegel so aus, dass nacheinander beide Empfänger getroffen werden.",
+      grid: [
+        "####################",
+        "#O..#....O.....#..O#",
+        "#...D..........D...#",
+        "#...#..T....2..#...#",
+        "#...#..........#...#",
+        "#...####....####...#",
+        "#L.......M.........#",
+        "#...####....####...#",
+        "#...#.O..S...O.#...#",
+        "#...#R...M....R#...#",
+        "#...D..........D...#",
+        "#O..#....O.....#..O#",
+        "####################"
+      ],
+      lasers: {
+        "1,6": { dir: "E", active: false }
+      },
+      mirrors: {
+        "9,6": "/",
+        "9,9": "/"
+      },
+      links: [
+        { from: [7, 3], to: [1, 6], mode: "toggle" },
+        { from: [5, 9], to: [4, 2], mode: "hold" },
+        { from: [5, 9], to: [4, 10], mode: "hold" },
+        { from: [14, 9], to: [15, 2], mode: "hold" },
+        { from: [14, 9], to: [15, 10], mode: "hold" }
+      ],
+      shards: {}
+    },
+
+    // --- LEVEL 19 (DUAL) ---
+    {
+      name: "Getrennte Welten (Dual)",
+      par: 75,
+      hint: "Blau und Gold sind durch Wasser und Sternenkluft getrennt. Öffnet euch gegenseitig über Terminals und Sensor-Platten die Schleusen.",
+      grid: [
+        "####################",
+        "#O..#.O.~..~.O.#..O#",
+        "#...D...~..~...D...#",
+        "#...#...~..~...#...#",
+        "#..P....~..~....P..#",
+        "#...iii.~..~.iii...#",
+        "#..S.O..~..~..O.K..#",
+        "#...rrr.a..a.rrr...#",
+        "#..T....a..a....T..#",
+        "#...#...a..a...#...#",
+        "#...D...a..a...D...#",
+        "#O..#...a..a...#..O#",
+        "####################"
+      ],
+      links: [
+        { from: [3, 8], to: [15, 10], mode: "toggle" },
+        { from: [16, 8], to: [4, 10], mode: "toggle" },
+        { from: [3, 4], to: [15, 2], mode: "hold" },
+        { from: [16, 4], to: [4, 2], mode: "hold" }
+      ],
+      shards: {}
+    },
+
+    // --- LEVEL 20 (DUAL FINALE) ---
+    {
+      name: "Der Kern des Äthers (Finale)",
+      par: 95,
+      hint: "Das große Finale mit 5 Äther-Paaren: Baut auf beiden Seiten Lichtbrücken, meistert Gravitation und lenkt den zentralen Laser auf beide Empfänger.",
+      grid: [
+        "####################",
+        "#O..#....L.....#..O#",
+        "#...D..........D...#",
+        "#...#..b...g...#...#",
+        "#...#..#...#...#...#",
+        "#...#..O...O...#...#",
+        "#..S.B~.G.X.~B..K..#",
+        "#...#..O...O...#...#",
+        "#...#..#...#...#...#",
+        "#..1C..........C2..#",
+        "#...#..R.M.R...#...#",
+        "#O.E#..O...O...#..O#",
+        "####################"
+      ],
+      lasers: {
+        "9,1": { dir: "S", active: true }
+      },
+      mirrors: {
+        "9,10": "/"
+      },
+      links: [
+        { from: [7, 10], to: [4, 2], mode: "hold" },
+        { from: [11, 10], to: [15, 2], mode: "hold" }
+      ],
+      shards: {}
+    }
   ];
 })();
