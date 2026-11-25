@@ -14,6 +14,7 @@
   const edCtx = edCanvas.getContext("2d");
   const edStatus = document.getElementById("edStatus");
   const edLevelName = document.getElementById("edLevelName");
+  const edLevelSelect = document.getElementById("edLevelSelect");
   const edBtnTest = document.getElementById("edBtnTest");
   const edBtnShare = document.getElementById("edBtnShare");
   const edBtnExport = document.getElementById("edBtnExport");
@@ -24,12 +25,15 @@
     { id: ".", label: "Boden",      color: "#1e2242" },
     { id: "#", label: "Wand",       color: "#3b3568" },
     { id: "O", label: "Äther-Stein",color: "#22d3ee" },
-    { id: "S", label: "Start",      color: "#38bdf8" },
+    { id: "S", label: "Start Blau", color: "#38bdf8" },
+    { id: "K", label: "Start Gold", color: "#fbbf24" },
+    { id: "b", label: "Tor Blau",   color: "#0284c7" },
+    { id: "g", label: "Tor Gold",   color: "#d97706" },
     { id: "i", label: "Eis",        color: "#67e8f9" },
     { id: "r", label: "Rubinfeld",  color: "#9d174d" },
     { id: "~", label: "Wasser",     color: "#0e7490" },
     { id: "a", label: "Kluft",      color: "#050714" },
-    { id: "B", label: "Stasis",     color: "#0284c7" },
+    { id: "B", label: "Stasis",     color: "#0369a1" },
     { id: "C", label: "Riss-Wand",  color: "#f59e0b" },
     { id: "W", label: "Tauscher",   color: "#a855f7" },
     { id: "T", label: "Terminal",   color: "#fb7185" },
@@ -78,16 +82,58 @@
     };
   }
 
+  function loadIntoEditor(obj) {
+    edData = {
+      name: obj.name || "Importierte Landschaft",
+      hint: obj.hint || "",
+      grid: obj.grid.map((r) => r.split("")),
+      lasers: obj.lasers ? JSON.parse(JSON.stringify(obj.lasers)) : {},
+      mirrors: obj.mirrors ? { ...obj.mirrors } : {},
+      links: obj.links ? obj.links.map((l) => ({ from: [...l.from], to: [...l.to], mode: l.mode })) : [],
+      shards: obj.shards ? { ...obj.shards } : {}
+    };
+    linkSource = null;
+    edLevelName.value = edData.name;
+    drawEditor();
+  }
+
   function exportLevelObject() {
     return {
       name: edLevelName.value.trim() || "Eigene Landschaft",
       hint: edData.hint,
       grid: edData.grid.map((r) => r.join("")),
-      lasers: { ...edData.lasers },
+      lasers: JSON.parse(JSON.stringify(edData.lasers)),
       mirrors: { ...edData.mirrors },
       links: edData.links.map((l) => ({ from: [...l.from], to: [...l.to], mode: l.mode })),
       shards: { ...edData.shards }
     };
+  }
+
+  // Dropdown mit allen vorhandenen Leveln füllen
+  function populateLevelSelect() {
+    if (!edLevelSelect || !window.ETHER || !Array.isArray(window.ETHER.LEVELS)) return;
+    edLevelSelect.innerHTML = '<option value="">Vorlage laden…</option>';
+    window.ETHER.LEVELS.forEach((lvl, idx) => {
+      const opt = document.createElement("option");
+      opt.value = String(idx);
+      opt.textContent = `Level ${idx + 1}: ${lvl.name}`;
+      edLevelSelect.appendChild(opt);
+    });
+  }
+
+  if (edLevelSelect) {
+    populateLevelSelect();
+    edLevelSelect.addEventListener("change", () => {
+      const val = edLevelSelect.value;
+      if (val === "") return;
+      const idx = parseInt(val, 10);
+      const lvl = window.ETHER.LEVELS[idx];
+      if (lvl) {
+        loadIntoEditor(lvl);
+        edStatus.textContent = `Level ${idx + 1} (${lvl.name}) als Vorlage geladen.`;
+      }
+      edLevelSelect.value = "";
+    });
   }
 
   // Palette aufbauen
@@ -155,11 +201,11 @@
       return;
     }
 
-    // Nur ein Startpunkt erlaubt
-    if (currentTool === "S") {
+    // Nur ein Startpunkt pro Farbe erlaubt
+    if (currentTool === "S" || currentTool === "K") {
       for (let ry = 0; ry < ROWS; ry++) {
         for (let rx = 0; rx < COLS; rx++) {
-          if (edData.grid[ry][rx] === "S") edData.grid[ry][rx] = ".";
+          if (edData.grid[ry][rx] === currentTool) edData.grid[ry][rx] = ".";
         }
       }
     }
@@ -313,17 +359,7 @@
     try {
       const obj = JSON.parse(raw);
       if (!Array.isArray(obj.grid) || obj.grid.length !== ROWS) throw new Error();
-      edData = {
-        name: obj.name || "Importierte Landschaft",
-        hint: obj.hint || "",
-        grid: obj.grid.map((r) => r.split("")),
-        lasers: obj.lasers || {},
-        mirrors: obj.mirrors || {},
-        links: obj.links || [],
-        shards: obj.shards || {}
-      };
-      edLevelName.value = edData.name;
-      drawEditor();
+      loadIntoEditor(obj);
       edStatus.textContent = "Level erfolgreich importiert!";
     } catch (_) {
       edStatus.textContent = "Ungültiges JSON-Format.";
