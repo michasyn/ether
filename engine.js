@@ -702,8 +702,22 @@
         }
       }
     }
-  }
 
+    // Kugel zerstören, falls sie sich bei der Detonation noch auf demselben Feld befindet
+    for (const m of state.marbles) {
+      if (!m.alive || m.shieldTimer > 0) continue;
+      const mTx = Math.max(0, Math.min(COLS - 1, Math.floor(m.x / TILE)));
+      const mTy = Math.max(0, Math.min(ROWS - 1, Math.floor(m.y / TILE)));
+      if (mTx === charge.tx && mTy === charge.ty) {
+        m.alive = false;
+        m.deathType = "laser";
+        m.deathDur = LASER_DEATH_DUR;
+        m.deathTimer = LASER_DEATH_DUR;
+        audio.updateSurfaceSound("standard", 0, pan, false);
+        spawnParticles(m.x, m.y, "#fbbf24", 20, 170, 3.6);
+      }
+    }
+  }
   // =========================================================================
   // 8. UI, VOLLBILD, GYROSKOP, POINTER LOCK & TOUCH
   // =========================================================================
