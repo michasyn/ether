@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#070914" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
+  <title>ETHER</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-orb"></div>
+        <div class="brand-title">ETHER</div>
+        <span class="brand-sub" id="hudLevelTag">Level 1</span>
+      </div>
+
+      <div class="hud-stats">
+        <div class="stat-pill">
+          <span class="stat-label">Paare</span>
+          <span class="stat-value" id="hudPairs">0 / 3</span>
+        </div>
+        <div class="stat-pill">
+          <span class="stat-label">Zeit</span>
+          <span class="stat-value" id="hudTime">00:00.0</span>
+        </div>
+        <div class="stat-pill shield-pill hidden" id="shieldPill">
+          <span class="stat-label">Schild</span>
+          <span class="stat-value" id="hudShield">10.0s</span>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button class="btn" id="btnLevels" title="Level-Übersicht">☰ Landschaften</button>
+        <button class="btn" id="btnEditor" title="Level-Editor öffnen">✎ Editor</button>
+        <button class="btn btn-back-editor hidden" id="btnBackToEditor">← Editor</button>
+        <button class="btn" id="btnGyro" title="Neigungssteuerung (Gyroskop) ein/aus">🧭</button>
+        <button class="btn hidden" id="btnGyroCal" title="Neigung neu kalibrieren">⌖</button>
+        <label class="sens-wrap" title="Empfindlichkeit (+ / -)">
+          Sens
+          <input type="range" id="sensSlider" min="0.4" max="2.4" step="0.1" value="1.0" />
+          <span id="sensValue">1.0×</span>
+        </label>
+        <button class="btn" id="btnFullscreen" title="Vollbild ein/aus">⛶</button>
+        <button class="btn" id="btnPause" title="Pause (ESC)">⏸</button>
+        <button class="btn" id="btnAudio" title="Ton an/aus">🔊</button>
+        <button class="btn" id="btnRestart" title="Neustart (R)">↻</button>
+      </div>
+    </header>
+
+    <main class="stage-wrap">
+      <canvas id="gameCanvas" width="960" height="624"></canvas>
+
+      <div class="holo-banner hidden" id="holoBanner">
+        <div class="holo-tag">ETHER-SYSTEM</div>
+        <div class="holo-text" id="holoText"></div>
+      </div>
+
+      <div class="overlay" id="overlay">
+        <div class="overlay-card">
+          <h2 id="overlayTitle">Willkommen in ETHER</h2>
+          <p id="overlayText"></p>
+          <div class="overlay-actions">
+            <button class="btn btn-primary" id="btnOverlayPrimary">Spielen</button>
+            <button class="btn" id="btnOverlaySecondary" style="display:none;">Nochmal spielen</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="bottombar">
+      <div class="status-left">
+        <div class="lives-orbs" id="livesOrbs" title="Verbleibende Äther-Kugeln"></div>
+        <span class="floor-badge" id="floorBadge">
+          <span class="floor-dot" id="floorDot"></span>
+          <span id="floorLabel">Äther-Boden</span>
+        </span>
+        <button class="btn btn-switch-orb hidden" id="btnSwitchOrb" title="Kugel wechseln (Q / Shift)">⇄ Blau</button>
+      </div>
+
+      <div class="inventory-bar">
+        <button class="btn btn-icon" id="btnPickupLock" title="Aufsammeln sperren / freigeben">🔓</button>
+        <div class="inv-slots" id="invSlots"></div>
+        <button class="btn btn-action" id="btnUseItem" title="Aktives Item nutzen (Linksklick / Leertaste)">Aktivieren</button>
+      </div>
+
+      <div class="hints">
+        <span>Desktop: <kbd>Klick</kbd> Maus sperren · <kbd>L-Klick</kbd>/<kbd>Space</kbd> Item · <kbd>R-Klick</kbd>/<kbd>Tab</kbd> Wechseln · <kbd>Q</kbd> Dual-Kugel</span>
+        <span class="sep">|</span>
+        <span>Touch: Wischen oder <kbd>🧭</kbd> Kippen</span>
+      </div>
+    </footer>
+  </div>
+
+  <!-- MODAL: LEVEL-ÜBERSICHT -->
+  <div class="modal-backdrop hidden" id="levelsModal">
+    <div class="modal-panel">
+      <div class="modal-header">
+        <div>
+          <h3>Landschaften</h3>
+          <span class="modal-sub" id="levelsProgress">0 / 10 gelöst</span>
+        </div>
+        <button class="btn" id="btnCloseLevels">✕</button>
+      </div>
+      <div class="levels-grid" id="levelsGrid"></div>
+    </div>
+  </div>
+
+  <!-- MODAL: ERWEITERTER LEVEL-EDITOR -->
+  <div class="modal-backdrop hidden" id="editorModal">
+    <div class="modal-panel editor-panel">
+      <div class="modal-header">
+        <div class="editor-title-wrap">
+          <h3>Level-Editor</h3>
+          <input type="text" id="edLevelName" class="ed-input" value="Eigene Landschaft" placeholder="Name der Landschaft" />
+        </div>
+        <div class="editor-top-actions">
+          <button class="btn btn-primary" id="edBtnTest">▶ Testen</button>
+          <button class="btn" id="edBtnShare" title="Level als Link kopieren">🔗 Link</button>
+          <button class="btn" id="edBtnExport" title="JSON kopieren">Export</button>
+          <button class="btn" id="edBtnImport" title="JSON einfügen">Import</button>
+          <button class="btn" id="edBtnClear" title="Feld leeren">Leeren</button>
+          <button class="btn" id="btnCloseEditor">✕</button>
+        </div>
+      </div>
+
+      <div class="editor-body">
+        <div class="editor-palette" id="edPalette"></div>
+        <div class="editor-canvas-wrap">
+          <canvas id="editorCanvas" width="800" height="520"></canvas>
+          <div class="editor-status" id="edStatus">Wähle ein Werkzeug und klicke oder ziehe über das Raster.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="audio.js"></script>
+  <script src="levels.js"></script>
+  <script src="engine.js"></script>
+  <script src="editor.js"></script>
+</body>
+</html>
