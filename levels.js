@@ -8,6 +8,7 @@
   // g = Goldenes Phasen-Tor (nur für Goldene Kugel passierbar)
 
   window.ETHER.LEVELS = [
+    // --- LEVEL 01 ---
     {
       name: "Erste Resonanz",
       par: 25,
@@ -30,6 +31,7 @@
       links: [],
       shards: {}
     },
+    // --- LEVEL 02 ---
     {
       name: "Brücke über der Sternenkluft",
       par: 35,
@@ -52,6 +54,7 @@
       links: [],
       shards: {}
     },
+    // --- LEVEL 03 ---
     {
       name: "Lichtbrücken & Schleusen",
       par: 45,
@@ -77,6 +80,7 @@
       ],
       shards: {}
     },
+    // --- LEVEL 04 ---
     {
       name: "Puls-Ladung & Phasen-Schild",
       par: 45,
@@ -101,6 +105,7 @@
         "6,6": "Tipp: Aktiviere den Phasen-Schild (🛡), um sicher über Wasser und Kluft zu gleiten. Hinter einer rissigen Wand wartet eine Extra-Kugel."
       }
     },
+    // --- LEVEL 05 ---
     {
       name: "Das Äther-Labyrinth",
       par: 65,
@@ -128,6 +133,7 @@
         "6,6": "Sektor-Log: Der Stasis-Quader baut eine Brücke über das Wasser. Auf der anderen Seite hält ein Quader die Sensor-Platte gedrückt."
       }
     },
+    // --- LEVEL 06 ---
     {
       name: "Lichtbrechung",
       par: 55,
@@ -160,6 +166,7 @@
       ],
       shards: {}
     },
+    // --- LEVEL 07 ---
     {
       name: "Gravitationsfelder",
       par: 50,
@@ -182,6 +189,7 @@
       links: [],
       shards: {}
     },
+    // --- LEVEL 08 ---
     {
       name: "Quanten-Konvergenz",
       par: 75,
@@ -217,6 +225,7 @@
     },
 
     // --- PHASE 5: DUAL-KUGEL-LANDSCHAFTEN (BLAU & GOLD) ---
+    // --- LEVEL 09 ---
     {
       name: "Zwei Resonanzen (Dual)",
       par: 60,
@@ -242,6 +251,7 @@
       ],
       shards: {}
     },
+    // --- LEVEL 10 ---
     {
       name: "Synchronität (Dual)",
       par: 80,
