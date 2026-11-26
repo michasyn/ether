@@ -1,4 +1,4 @@
-const CACHE_NAME = "ether-cache-v13";
+const CACHE_NAME = "ether-cache-v14";
 const CORE_ASSETS = [
   "./",
   "./index.html",
