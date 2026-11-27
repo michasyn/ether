@@ -25,6 +25,8 @@
   const WATER_DEATH_DUR = 0.95;
   const ABYSS_DEATH_DUR = 0.65;
   const LASER_DEATH_DUR = 0.55;
+  const RUBY_SINK_DUR = 4.0;
+  const RUBY_DEATH_DUR = 0.55;
   const MAX_INVENTORY = 5;
   const MAX_LIVES = 5;
   const GRAVITY_RADIUS = TILE * 3.6;
@@ -178,7 +180,8 @@
     gyroZeroBeta: 0,
     gyroZeroGamma: 0,
     wallSoundCooldown: 0,
-    idleTimer: 0
+    idleTimer: 0,
+    winSeq: null
   };
 
   function createMarble(colorType, sx, sy) {
@@ -190,6 +193,7 @@
       rollX: 0, rollY: 0,
       alive: true,
       shieldTimer: 0,
+      rubySinkTimer: 0,
       deathType: null,
       deathTimer: 0,
       deathDur: 0.65,
@@ -250,8 +254,281 @@
   }
 
   // =========================================================================
-  // 4. LEVEL-ÜBERSICHT (MODAL)
+  // 4. LEVEL-ÜBERSICHT (MODAL) & MINIATUR-VORSCHAU
   // =========================================================================
+  const PREVIEW_TILE = 16;
+  const levelPreviewCache = new Map();
+  let previewCanvas = null;
+
+  function renderLevelPreview(lvl) {
+    if (!previewCanvas) {
+      previewCanvas = document.createElement("canvas");
+      previewCanvas.width = COLS * PREVIEW_TILE;
+      previewCanvas.height = ROWS * PREVIEW_TILE;
+    }
+    const pctx = previewCanvas.getContext("2d");
+    const T = PREVIEW_TILE;
+    const W = previewCanvas.width;
+    const H = previewCanvas.height;
+
+    pctx.clearRect(0, 0, W, H);
+
+    for (let y = 0; y < ROWS; y++) {
+      const rowStr = (lvl.grid && lvl.grid[y]) || "####################";
+      for (let x = 0; x < COLS; x++) {
+        const ch = rowStr[x] || ".";
+        const px = x * T;
+        const py = y * T;
+        const cx = px + T * 0.5;
+        const cy = py + T * 0.5;
+        const key = `${x},${y}`;
+
+        // 1. Boden zeichnen
+        if (ch === "i") {
+          const g = pctx.createLinearGradient(px, py, px + T, py + T);
+          g.addColorStop(0, "#7dd3fc");
+          g.addColorStop(1, "#0284c7");
+          pctx.fillStyle = g;
+          pctx.fillRect(px, py, T, T);
+          pctx.strokeStyle = "rgba(255, 255, 255, 0.45)";
+          pctx.lineWidth = 1;
+          pctx.beginPath();
+          pctx.moveTo(px + 3, py + T - 3);
+          pctx.lineTo(px + T - 3, py + 3);
+          pctx.stroke();
+        } else if (ch === "r") {
+          const g = pctx.createLinearGradient(px, py, px + T, py + T);
+          g.addColorStop(0, "#7a1f52");
+          g.addColorStop(1, "#4c1338");
+          pctx.fillStyle = g;
+          pctx.fillRect(px, py, T, T);
+          pctx.fillStyle = "rgba(244, 114, 182, 0.5)";
+          pctx.fillRect(px + 3, py + 3, 2, 2);
+          pctx.fillRect(px + T - 5, py + T - 5, 2, 2);
+          pctx.fillRect(px + T - 5, py + 3, 1.5, 1.5);
+        } else if (ch === "~") {
+          const g = pctx.createLinearGradient(px, py, px, py + T);
+          g.addColorStop(0, "#0e7490");
+          g.addColorStop(1, "#082f49");
+          pctx.fillStyle = g;
+          pctx.fillRect(px, py, T, T);
+          pctx.strokeStyle = "rgba(103, 232, 249, 0.55)";
+          pctx.lineWidth = 1.2;
+          pctx.beginPath();
+          pctx.moveTo(px + 2, cy);
+          pctx.quadraticCurveTo(cx, cy - 2.5, px + T - 2, cy);
+          pctx.stroke();
+        } else if (ch === "a") {
+          pctx.fillStyle = "#040611";
+          pctx.fillRect(px, py, T, T);
+          if ((x * 73 + y * 137) % 11 < 3) {
+            pctx.fillStyle = "rgba(196, 181, 253, 0.55)";
+            pctx.fillRect(px + 4 + ((x * 5 + y * 3) % 8), py + 4 + ((x * 3 + y * 7) % 8), 1.4, 1.4);
+          }
+        } else {
+          const alt = (x + y) % 2 === 0;
+          pctx.fillStyle = alt ? "#1e2242" : "#181e3a";
+          pctx.fillRect(px, py, T, T);
+          pctx.strokeStyle = "rgba(129, 140, 248, 0.1)";
+          pctx.lineWidth = 0.75;
+          pctx.strokeRect(px + 0.35, py + 0.35, T - 0.7, T - 0.7);
+        }
+
+        // Sensor-Platte
+        if (ch === "P") {
+          pctx.fillStyle = "rgba(167, 139, 250, 0.28)";
+          pctx.fillRect(px + 2, py + 2, T - 4, T - 4);
+          pctx.strokeStyle = "#a78bfa";
+          pctx.lineWidth = 1.2;
+          pctx.strokeRect(px + 2.5, py + 2.5, T - 5, T - 5);
+        }
+
+        // 2. Steine, Tore & Mechaniken (Extra-Kugel "E" bewusst als Spoiler-Schutz ausgeblendet)
+        if (ch === "#" || ch === "C") {
+          const g = pctx.createLinearGradient(px, py, px + T, py + T);
+          g.addColorStop(0, ch === "C" ? "#563b75" : "#3f3970");
+          g.addColorStop(1, ch === "C" ? "#2e1f45" : "#22254a");
+          pctx.fillStyle = g;
+          pctx.fillRect(px, py, T, T);
+          pctx.fillStyle = "rgba(167, 139, 250, 0.42)";
+          pctx.fillRect(px, py, T, 1.5);
+          pctx.fillRect(px, py, 1.5, T);
+          pctx.fillStyle = "#101227";
+          pctx.fillRect(px, py + T - 1.5, T, 1.5);
+          pctx.fillRect(px + T - 1.5, py, 1.5, T);
+          if (ch === "C") {
+            pctx.strokeStyle = "#fbbf24";
+            pctx.lineWidth = 1.3;
+            pctx.beginPath();
+            pctx.moveTo(px + 3, py + 3);
+            pctx.lineTo(cx, cy);
+            pctx.lineTo(px + T - 3, py + 5);
+            pctx.moveTo(cx, cy);
+            pctx.lineTo(px + 5, py + T - 3);
+            pctx.stroke();
+          }
+        } else if (ch === "O") {
+          pctx.fillStyle = "#191e3a";
+          pctx.fillRect(px + 0.5, py + 0.5, T - 1, T - 1);
+          pctx.strokeStyle = "rgba(167, 139, 250, 0.65)";
+          pctx.lineWidth = 1.2;
+          pctx.strokeRect(px + 1, py + 1, T - 2, T - 2);
+          pctx.fillStyle = "#080b1a";
+          pctx.beginPath();
+          pctx.arc(cx, cy, T * 0.31, 0, Math.PI * 2);
+          pctx.fill();
+          pctx.strokeStyle = "#7dd3fc";
+          pctx.lineWidth = 1.1;
+          pctx.beginPath();
+          pctx.arc(cx, cy, T * 0.21, 0, Math.PI * 2);
+          pctx.stroke();
+          pctx.fillStyle = "#bae6fd";
+          pctx.beginPath();
+          pctx.arc(cx, cy, 1.4, 0, Math.PI * 2);
+          pctx.fill();
+        } else if (ch === "B") {
+          pctx.fillStyle = "#1e293b";
+          pctx.fillRect(px + 1.5, py + 1.5, T - 3, T - 3);
+          pctx.strokeStyle = "#38bdf8";
+          pctx.lineWidth = 1.4;
+          pctx.strokeRect(px + 2, py + 2, T - 4, T - 4);
+          pctx.fillStyle = "#e0f2fe";
+          pctx.beginPath();
+          pctx.arc(cx, cy, 2, 0, Math.PI * 2);
+          pctx.fill();
+        } else if (ch === "W") {
+          pctx.fillStyle = "#24193b";
+          pctx.fillRect(px + 1.5, py + 1.5, T - 3, T - 3);
+          pctx.strokeStyle = "#c084fc";
+          pctx.lineWidth = 1.4;
+          pctx.strokeRect(px + 2, py + 2, T - 4, T - 4);
+          pctx.fillStyle = "#e9d5ff";
+          pctx.fillRect(px + 4, cy - 2, T - 8, 1.4);
+          pctx.fillRect(px + 4, cy + 1, T - 8, 1.4);
+        } else if (ch === "T") {
+          pctx.fillStyle = "#1e1b4b";
+          pctx.fillRect(px + 1, py + 1, T - 2, T - 2);
+          pctx.strokeStyle = "#fb7185";
+          pctx.lineWidth = 1.2;
+          pctx.strokeRect(px + 1.5, py + 1.5, T - 3, T - 3);
+          pctx.fillStyle = "#fb7185";
+          pctx.beginPath();
+          pctx.arc(cx, cy, 3, 0, Math.PI * 2);
+          pctx.fill();
+        } else if (ch === "D") {
+          pctx.fillStyle = "rgba(56, 189, 248, 0.28)";
+          pctx.fillRect(px + 1.5, py + 1.5, T - 3, T - 3);
+          pctx.strokeStyle = "#38bdf8";
+          pctx.lineWidth = 1.3;
+          pctx.strokeRect(px + 2, py + 2, T - 4, T - 4);
+        } else if (ch === "b" || ch === "g") {
+          const isGoldGate = ch === "g";
+          pctx.fillStyle = isGoldGate ? "rgba(251, 191, 36, 0.25)" : "rgba(56, 189, 248, 0.25)";
+          pctx.fillRect(px + 1.5, py + 1.5, T - 3, T - 3);
+          pctx.strokeStyle = isGoldGate ? "#fbbf24" : "#38bdf8";
+          pctx.lineWidth = 1.3;
+          pctx.strokeRect(px + 2, py + 2, T - 4, T - 4);
+          pctx.fillStyle = isGoldGate ? "#fbbf24" : "#38bdf8";
+          pctx.beginPath();
+          pctx.arc(cx, cy, 2.2, 0, Math.PI * 2);
+          pctx.fill();
+        } else if (ch === "L") {
+          const cfg = (lvl.lasers && lvl.lasers[key]) || { dir: "E", active: true };
+          const [dx, dy] = DIR_VECS[cfg.dir || "E"] || [1, 0];
+          pctx.fillStyle = "#1e1b33";
+          pctx.fillRect(px + 1, py + 1, T - 2, T - 2);
+          pctx.strokeStyle = "#f43f5e";
+          pctx.lineWidth = 1.3;
+          pctx.strokeRect(px + 1.5, py + 1.5, T - 3, T - 3);
+          pctx.fillStyle = cfg.active !== false ? "#fb7185" : "#64748b";
+          pctx.beginPath();
+          pctx.arc(cx + dx * 3, cy + dy * 3, 2.4, 0, Math.PI * 2);
+          pctx.fill();
+        } else if (ch === "M") {
+          const angle = (lvl.mirrors && lvl.mirrors[key]) || "/";
+          pctx.fillStyle = "#162038";
+          pctx.fillRect(px + 2, py + 2, T - 4, T - 4);
+          pctx.strokeStyle = "#e0f2fe";
+          pctx.lineWidth = 2;
+          pctx.lineCap = "round";
+          pctx.beginPath();
+          if (angle === "/") {
+            pctx.moveTo(px + 3.5, py + T - 3.5);
+            pctx.lineTo(px + T - 3.5, py + 3.5);
+          } else {
+            pctx.moveTo(px + 3.5, py + 3.5);
+            pctx.lineTo(px + T - 3.5, py + T - 3.5);
+          }
+          pctx.stroke();
+        } else if (ch === "R") {
+          pctx.fillStyle = "#181e36";
+          pctx.fillRect(px + 1, py + 1, T - 2, T - 2);
+          pctx.strokeStyle = "#34d399";
+          pctx.lineWidth = 1.2;
+          pctx.strokeRect(px + 1.5, py + 1.5, T - 3, T - 3);
+          pctx.fillStyle = "#34d399";
+          pctx.beginPath();
+          pctx.arc(cx, cy, 3, 0, Math.PI * 2);
+          pctx.fill();
+        } else if (ch === "G" || ch === "X") {
+          const attract = ch === "G";
+          pctx.fillStyle = attract ? "#1e163d" : "#361e14";
+          pctx.fillRect(px + 1.5, py + 1.5, T - 3, T - 3);
+          pctx.strokeStyle = attract ? "#a78bfa" : "#fb923c";
+          pctx.lineWidth = 1.2;
+          pctx.strokeRect(px + 2, py + 2, T - 4, T - 4);
+          pctx.fillStyle = attract ? "#c084fc" : "#fb923c";
+          pctx.beginPath();
+          pctx.arc(cx, cy, 3.2, 0, Math.PI * 2);
+          pctx.fill();
+        } else if (ch === "1" || ch === "2" || ch === "3") {
+          const itemCol = ch === "1" ? "#fbbf24" : (ch === "2" ? "#34d399" : "#38bdf8");
+          pctx.fillStyle = itemCol;
+          pctx.beginPath();
+          pctx.moveTo(cx, cy - 3.5);
+          pctx.lineTo(cx + 3.5, cy);
+          pctx.lineTo(cx, cy + 3.5);
+          pctx.lineTo(cx - 3.5, cy);
+          pctx.closePath();
+          pctx.fill();
+        } else if (ch === "S" || ch === "K") {
+          const isGold = ch === "K";
+          const aura = pctx.createRadialGradient(cx, cy, 1, cx, cy, T * 0.52);
+          aura.addColorStop(0, isGold ? "rgba(253, 224, 71, 0.75)" : "rgba(56, 189, 248, 0.75)");
+          aura.addColorStop(1, "rgba(0, 0, 0, 0)");
+          pctx.fillStyle = aura;
+          pctx.beginPath();
+          pctx.arc(cx, cy, T * 0.52, 0, Math.PI * 2);
+          pctx.fill();
+
+          const mg = pctx.createRadialGradient(cx - 1.5, cy - 1.5, 0.5, cx, cy, T * 0.34);
+          if (isGold) {
+            mg.addColorStop(0, "#fffbeb");
+            mg.addColorStop(0.45, "#fde047");
+            mg.addColorStop(1, "#b45309");
+          } else {
+            mg.addColorStop(0, "#f0f9ff");
+            mg.addColorStop(0.45, "#38bdf8");
+            mg.addColorStop(1, "#1d4ed8");
+          }
+          pctx.fillStyle = mg;
+          pctx.beginPath();
+          pctx.arc(cx, cy, T * 0.34, 0, Math.PI * 2);
+          pctx.fill();
+        }
+      }
+    }
+
+    return previewCanvas.toDataURL("image/png");
+  }
+
+  function getLevelPreviewUrl(idx, lvl) {
+    if (!levelPreviewCache.has(idx)) {
+      levelPreviewCache.set(idx, renderLevelPreview(lvl));
+    }
+    return levelPreviewCache.get(idx);
+  }
+
   function renderLevelsModal() {
     levelsGrid.innerHTML = "";
     let solvedCount = 0;
@@ -263,24 +540,63 @@
       const beatPar = isSolved && lvl.par && rec.bestTime <= lvl.par;
 
       const card = document.createElement("button");
+      card.type = "button";
       card.className = "level-card"
         + (!state.customLevel && state.levelIndex === idx ? " current" : "")
         + (isSolved ? " solved" : "");
 
-      card.innerHTML = `
-        <div class="lc-top">
-          <span>Level ${idx + 1}</span>
-          <span class="lc-badges">
-            ${isSolved ? '<span title="Gelöst" style="color:#34d399;">✓</span>' : ""}
-            ${beatPar ? '<span title="PAR-Zeit geschlagen" style="color:#fbbf24;">★</span>' : ""}
-          </span>
-        </div>
-        <div class="lc-title">${lvl.name}</div>
-        <div class="lc-times">
-          <span>PAR: ${lvl.par ? formatTime(lvl.par) : "--"}</span>
-          <span class="lc-best">${isSolved ? "Best: " + formatTime(rec.bestTime) : "Offen"}</span>
-        </div>
-      `;
+      const previewWrap = document.createElement("div");
+      previewWrap.className = "lc-preview-wrap";
+      const previewImg = document.createElement("img");
+      previewImg.className = "lc-preview";
+      previewImg.src = getLevelPreviewUrl(idx, lvl);
+      previewImg.alt = `Vorschau von Level ${idx + 1}: ${lvl.name}`;
+      previewImg.width = COLS * PREVIEW_TILE;
+      previewImg.height = ROWS * PREVIEW_TILE;
+      previewImg.decoding = "async";
+      previewWrap.appendChild(previewImg);
+
+      const top = document.createElement("div");
+      top.className = "lc-top";
+      const lvlNum = document.createElement("span");
+      lvlNum.textContent = `Level ${idx + 1}`;
+      const badges = document.createElement("span");
+      badges.className = "lc-badges";
+      if (isSolved) {
+        const check = document.createElement("span");
+        check.title = "Gelöst";
+        check.style.color = "#34d399";
+        check.textContent = "✓";
+        badges.appendChild(check);
+      }
+      if (beatPar) {
+        const star = document.createElement("span");
+        star.title = "PAR-Zeit geschlagen";
+        star.style.color = "#fbbf24";
+        star.textContent = "★";
+        badges.appendChild(star);
+      }
+      top.appendChild(lvlNum);
+      top.appendChild(badges);
+
+      const title = document.createElement("div");
+      title.className = "lc-title";
+      title.textContent = lvl.name;
+
+      const times = document.createElement("div");
+      times.className = "lc-times";
+      const parSpan = document.createElement("span");
+      parSpan.textContent = `PAR: ${lvl.par ? formatTime(lvl.par) : "--"}`;
+      const bestSpan = document.createElement("span");
+      bestSpan.className = "lc-best";
+      bestSpan.textContent = isSolved ? `Best: ${formatTime(rec.bestTime)}` : "Offen";
+      times.appendChild(parSpan);
+      times.appendChild(bestSpan);
+
+      card.appendChild(previewWrap);
+      card.appendChild(top);
+      card.appendChild(title);
+      card.appendChild(times);
 
       card.addEventListener("click", () => {
         levelsModal.classList.add("hidden");
@@ -354,6 +670,7 @@
     state.pendingMouseY = 0;
     state.holoTimer = 0;
     state.idleTimer = 0;
+    state.winSeq = null;
     holoBanner.classList.add("hidden");
 
     let blueSpawn = { x: 2.5 * TILE, y: 6.5 * TILE };
@@ -408,7 +725,7 @@
           stone = { type: "gravity", x, y, polarity: ch === "G" ? 1 : -1 };
           state.gravityCores.push(stone);
         } else if (ch === "O") {
-          stone = { type: "oxyd", x, y, pairId: 0, status: "closed", openAnim: 0, cooldown: 0, hintGlow: 0 };
+          stone = { type: "oxyd", x, y, pairId: 0, status: "closed", openAnim: 0, cooldown: 0, hintGlow: 0, winFlash: 0 };
           state.oxydList.push(stone);
         } else if (ch === "1") {
           item = { type: "pulse" };
@@ -474,6 +791,7 @@
   }
 
   function loadLevel(index, keepOverlay = true) {
+    if (!Array.isArray(LEVELS) || !LEVELS[index]) return;
     state.levelIndex = index;
     state.customLevel = null;
     loadLevelData(LEVELS[index], keepOverlay);
@@ -486,6 +804,7 @@
     m.vy = 0;
     m.alive = true;
     m.shieldTimer = 0;
+    m.rubySinkTimer = 0;
     m.deathType = null;
     m.deathTimer = 0;
     m.spawnFade = 0.5;
@@ -539,6 +858,8 @@
       let cy = laser.y;
       let sx = (cx + 0.5) * TILE + dx * (TILE * 0.45);
       let sy = (cy + 0.5) * TILE + dy * (TILE * 0.45);
+      let distOffset = 0;
+      let isStart = true;
 
       for (let step = 0; step < 64; step++) {
         cx += dx;
@@ -546,7 +867,7 @@
         if (cx < 0 || cx >= COLS || cy < 0 || cy >= ROWS) {
           const ex = (cx - dx + 0.5) * TILE + dx * (TILE * 0.5);
           const ey = (cy - dy + 0.5) * TILE + dy * (TILE * 0.5);
-          state.laserBeams.push({ x1: sx, y1: sy, x2: ex, y2: ey });
+          state.laserBeams.push({ x1: sx, y1: sy, x2: ex, y2: ey, distOffset, isStart, endType: "edge" });
           break;
         }
 
@@ -557,7 +878,10 @@
         const midY = (cy + 0.5) * TILE;
 
         if (st.type === "mirror") {
-          state.laserBeams.push({ x1: sx, y1: sy, x2: midX, y2: midY });
+          const segLen = Math.hypot(midX - sx, midY - sy);
+          state.laserBeams.push({ x1: sx, y1: sy, x2: midX, y2: midY, distOffset, isStart, endType: "mirror" });
+          distOffset += segLen;
+          isStart = false;
           if (st.angle === "/") {
             const ndx = -dy;
             const ndy = -dx;
@@ -572,14 +896,18 @@
         }
 
         if (st.type === "receiver") {
-          state.laserBeams.push({ x1: sx, y1: sy, x2: midX, y2: midY });
+          state.laserBeams.push({ x1: sx, y1: sy, x2: midX, y2: midY, distOffset, isStart, endType: "receiver" });
           st.poweredThisStep = true;
           break;
         }
 
         const ex = midX - dx * (TILE * 0.48);
         const ey = midY - dy * (TILE * 0.48);
-        state.laserBeams.push({ x1: sx, y1: sy, x2: ex, y2: ey });
+        state.laserBeams.push({ x1: sx, y1: sy, x2: ex, y2: ey, distOffset, isStart, endType: "impact" });
+
+        if (allowEffects && state.mode === "playing" && Math.random() < 0.08) {
+          spawnParticles(ex, ey, "#fb7185", 1, 55, 1.9);
+        }
 
         if (allowEffects && st.type === "oxyd" && st.status === "closed" && st.cooldown <= 0) {
           handleOxydHit(st);
@@ -763,7 +1091,12 @@
     const fKey = m ? getFloorAt(m.x, m.y) : "standard";
     const fp = FLOOR_PROPS[fKey] || FLOOR_PROPS.standard;
     floorDot.style.background = fp.dot;
-    floorLabel.textContent = fp.name;
+    if (fKey === "red" && m && m.alive && m.rubySinkTimer > 0 && m.shieldTimer <= 0) {
+      const rem = Math.max(0, RUBY_SINK_DUR - m.rubySinkTimer);
+      floorLabel.textContent = `${fp.name} (${rem.toFixed(1)}s)`;
+    } else {
+      floorLabel.textContent = fp.name;
+    }
   }
 
   function setSensitivity(val) {
@@ -1080,9 +1413,9 @@
       spawnParticles((partner.x + 0.5) * TILE, (partner.y + 0.5) * TILE, sym.color, 20, 170, 4);
 
       if (state.matchedPairs >= state.totalPairs && state.totalPairs > 0) {
-        state.mode = "won";
+        state.mode = "winning";
+        state.activeCharges = [];
         audio.updateSurfaceSound("standard", 0, 0, false);
-        audio.playLevelWin();
         exitPointerLock();
 
         let extraMsg = "";
@@ -1099,14 +1432,15 @@
           if (par && state.elapsed <= par) extraMsg += `\n★ PAR-Zeit (${formatTime(par)}) geschlagen!`;
         }
 
-        const isLast = !state.customLevel && state.levelIndex === LEVELS.length - 1;
-        showOverlay(
-          "Landschaft vollendet!",
-          `Alle ${state.totalPairs} Äther-Paare in ${formatTime(state.elapsed)} erweckt.${extraMsg}`,
-          state.customLevel ? "Nochmal testen" : (isLast ? "Zurück zu Level 1" : "Nächstes Level starten"),
-          true,
-          "Zeit verbessern"
-        );
+        const stepDur = Math.max(0.11, Math.min(0.19, 1.35 / Math.max(1, state.oxydList.length)));
+        state.winSeq = {
+          stones: [...state.oxydList],
+          index: 0,
+          timer: 0.22,
+          stepDur,
+          holdDur: 0.36,
+          extraMsg
+        };
       }
     } else {
       state.activeOxyd.status = "closed";
@@ -1115,6 +1449,19 @@
       audio.playOxydMismatch(pan);
       spawnParticles(cx, cy, sym.color, 8, 90, 2.5);
     }
+  }
+
+  function finishLevelWin(extraMsg) {
+    state.mode = "won";
+    audio.playLevelWin();
+    const isLast = !state.customLevel && state.levelIndex === LEVELS.length - 1;
+    showOverlay(
+      "Landschaft vollendet!",
+      `Alle ${state.totalPairs} Äther-Paare in ${formatTime(state.elapsed)} erweckt.${extraMsg}`,
+      state.customLevel ? "Nochmal testen" : (isLast ? "Zurück zu Level 1" : "Nächstes Level starten"),
+      true,
+      "Zeit verbessern"
+    );
   }
 
   function tryPushStasisBlock(stone, pushDx, pushDy) {
@@ -1199,6 +1546,7 @@
         if (st.type === "oxyd") {
           const target = (st.status === "closed") ? 0 : 1;
           st.openAnim += (target - st.openAnim) * Math.min(1, dt * 16);
+          if (st.winFlash > 0) st.winFlash = Math.max(0, st.winFlash - dt * 2.4);
         } else if (st.type === "gate") {
           const target = st.open ? 1 : 0;
           st.openAnim += (target - st.openAnim) * Math.min(1, dt * 12);
@@ -1232,6 +1580,33 @@
       }
     }
 
+    if (state.mode === "winning" && state.winSeq) {
+      for (const m of state.marbles) {
+        if (!m.alive) continue;
+        m.vx *= Math.exp(-5.5 * dt);
+        m.vy *= Math.exp(-5.5 * dt);
+      }
+      const seq = state.winSeq;
+      seq.timer -= dt;
+      if (seq.timer <= 0) {
+        if (seq.index < seq.stones.length) {
+          const st = seq.stones[seq.index++];
+          const sx = (st.x + 0.5) * TILE;
+          const sy = (st.y + 0.5) * TILE;
+          const sym = OXYD_SYMBOLS[st.pairId];
+          st.winFlash = 1.0;
+          audio.playOxydOpen(sym.freq, getPan(sx, sy));
+          spawnParticles(sx, sy, sym.color, 10, 125, 3.0);
+          seq.timer = seq.index < seq.stones.length ? seq.stepDur : seq.holdDur;
+        } else {
+          const extraMsg = seq.extraMsg;
+          state.winSeq = null;
+          finishLevelWin(extraMsg);
+        }
+      }
+      return;
+    }
+
     if (state.mode !== "playing") return;
     state.elapsed += dt;
 
@@ -1254,6 +1629,8 @@
 
         if (m.deathType === "water" && Math.random() < dt * 12) {
           spawnParticles(m.x, m.y, "#a5f3fc", 1, 25, 3.2, "bubble");
+        } else if (m.deathType === "ruby" && Math.random() < dt * 14) {
+          spawnParticles(m.x, m.y, "#f472b6", 1, 28, 3.2, "bubble");
         }
 
         if (m.deathTimer <= 0) {
@@ -1280,7 +1657,7 @@
       if (m.shieldTimer > 0) m.shieldTimer = Math.max(0, m.shieldTimer - dt);
 
       const floorType = getFloorAt(m.x, m.y);
-      const fp = (m.shieldTimer > 0 && (floorType === "water" || floorType === "abyss"))
+      const fp = (m.shieldTimer > 0 && (floorType === "water" || floorType === "abyss" || floorType === "red"))
         ? FLOOR_PROPS.standard
         : (FLOOR_PROPS[floorType] || FLOOR_PROPS.standard);
 
@@ -1544,14 +1921,20 @@
       }
     }
 
-    // Gefahren (Laser, Wasser, Abgrund) für alle Kugeln prüfen
+    // Gefahren (Laser, Wasser, Abgrund, Rubinfeld) für alle Kugeln prüfen
     for (const m of state.marbles) {
-      if (!m.alive || m.shieldTimer > 0) continue;
+      if (!m.alive) continue;
+
+      if (m.shieldTimer > 0) {
+        if (m.rubySinkTimer > 0) m.rubySinkTimer = Math.max(0, m.rubySinkTimer - dt * 4.0);
+        continue;
+      }
 
       if (state.laserBeams.length > 0) {
         const hitRadSq = (MARBLE_RADIUS * 0.72) ** 2;
         for (const seg of state.laserBeams) {
           if (distToSegmentSq(m.x, m.y, seg.x1, seg.y1, seg.x2, seg.y2) < hitRadSq) {
+            m.rubySinkTimer = 0;
             m.alive = false;
             m.deathType = "laser";
             m.deathDur = LASER_DEATH_DUR;
@@ -1568,6 +1951,7 @@
       if (!m.alive) continue;
       const newFloor = getFloorAt(m.x, m.y);
       if (newFloor === "water" || newFloor === "abyss") {
+        m.rubySinkTimer = 0;
         m.alive = false;
         m.deathType = newFloor;
         m.deathDur = newFloor === "water" ? WATER_DEATH_DUR : ABYSS_DEATH_DUR;
@@ -1577,6 +1961,33 @@
         audio.playHazard(newFloor, pan);
         if (newFloor === "water") spawnParticles(m.x, m.y, "#a5f3fc", 10, 55, 3.8, "bubble");
         else spawnParticles(m.x, m.y, "#818cf8", 16, 80, 3);
+      } else if (newFloor === "red") {
+        m.rubySinkTimer = Math.min(RUBY_SINK_DUR, m.rubySinkTimer + dt);
+        const sinkRatio = m.rubySinkTimer / RUBY_SINK_DUR;
+        if (m.rubySinkTimer > 0.2 && Math.random() < dt * (3 + sinkRatio * 10)) {
+          spawnParticles(
+            m.x,
+            m.y,
+            sinkRatio > 0.68 ? "#fb7185" : "#f472b6",
+            1,
+            20 + sinkRatio * 26,
+            2.4 + sinkRatio * 1.4,
+            "bubble"
+          );
+        }
+        if (m.rubySinkTimer >= RUBY_SINK_DUR) {
+          m.alive = false;
+          m.deathType = "ruby";
+          m.deathDur = RUBY_DEATH_DUR;
+          m.deathTimer = RUBY_DEATH_DUR;
+          const pan = getPan(m.x, m.y);
+          audio.updateSurfaceSound("standard", 0, pan, false);
+          audio.playHazard("ruby", pan);
+          spawnParticles(m.x, m.y, "#f472b6", 18, 95, 3.5);
+          spawnParticles(m.x, m.y, "#be185d", 10, 60, 4.0, "bubble");
+        }
+      } else if (m.rubySinkTimer > 0) {
+        m.rubySinkTimer = Math.max(0, m.rubySinkTimer - dt * 3.5);
       }
     }
   }
@@ -1654,16 +2065,17 @@
       ctx.lineWidth = 1;
       ctx.strokeRect(x + 0.5, y + 0.5, TILE - 1, TILE - 1);
     } else if (type === "red") {
+      const shimmer = Math.sin(state.animTime * 2.1 + tx * 0.8 + ty * 0.6) * 0.5 + 0.5;
       const grad = ctx.createLinearGradient(x, y, x + TILE, y + TILE);
       grad.addColorStop(0, "#6d1d4a");
       grad.addColorStop(1, "#4c1338");
       ctx.fillStyle = grad;
       ctx.fillRect(x, y, TILE, TILE);
-      ctx.fillStyle = "rgba(244, 114, 182, 0.32)";
+      ctx.fillStyle = `rgba(244, 114, 182, ${0.24 + shimmer * 0.16})`;
       for (let py = 10; py < TILE; py += 14) {
         for (let px = 10; px < TILE; px += 14) {
           ctx.beginPath();
-          ctx.arc(x + px, y + py, 2.2, 0, Math.PI * 2);
+          ctx.arc(x + px, y + py + Math.sin(state.animTime * 1.8 + px + py) * 0.9, 2.2, 0, Math.PI * 2);
           ctx.fill();
         }
       }
@@ -2023,16 +2435,35 @@
       ctx.fill();
 
       if (stone.openAnim > 0.04) {
+        const wf = stone.winFlash || 0;
         const pulse = stone.status === "open" ? 0.8 + Math.sin(state.animTime * 8) * 0.2 : 1.0;
         ctx.save();
-        ctx.shadowColor = sym.color;
-        ctx.shadowBlur = stone.status === "matched" ? 18 : 13 * pulse;
+        ctx.shadowColor = wf > 0.05 ? "#ffffff" : sym.color;
+        ctx.shadowBlur = (stone.status === "matched" ? 18 : 13 * pulse) + wf * 20;
         ctx.fillStyle = sym.glow;
         ctx.beginPath();
-        ctx.arc(cx, cy, 14.5 * stone.openAnim, 0, Math.PI * 2);
+        ctx.arc(cx, cy, (14.5 + wf * 3.5) * stone.openAnim, 0, Math.PI * 2);
         ctx.fill();
+
+        if (wf > 0.01) {
+          ctx.fillStyle = `rgba(255, 255, 255, ${(wf * 0.58).toFixed(3)})`;
+          ctx.beginPath();
+          ctx.arc(cx, cy, 15.5, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.strokeStyle = `rgba(255, 255, 255, ${(wf * 0.9).toFixed(3)})`;
+          ctx.lineWidth = 2.8;
+          ctx.strokeRect(x + 2, y + 2, TILE - 4, TILE - 4);
+
+          ctx.strokeStyle = sym.color;
+          ctx.globalAlpha = wf * 0.85;
+          ctx.lineWidth = 2.4;
+          ctx.beginPath();
+          ctx.arc(cx, cy, 15 + (1 - wf) * 14, 0, Math.PI * 2);
+          ctx.stroke();
+        }
         ctx.restore();
-        drawSymbol(cx, cy, sym.shape, sym.color, stone.openAnim);
+        drawSymbol(cx, cy, sym.shape, sym.color, stone.openAnim * (1 + wf * 0.22));
       } else {
         const hg = stone.hintGlow || 0;
         if (hg > 0.02) {
@@ -2063,23 +2494,129 @@
 
   function drawLaserBeams() {
     if (state.laserBeams.length === 0) return;
-    const flicker = 0.85 + Math.sin(state.animTime * 28) * 0.15;
+    const t = state.animTime;
+    const pulse = 0.84 + Math.sin(t * 7.5) * 0.16;
+    const flicker = 0.88 + Math.sin(t * 31) * 0.08 + Math.cos(t * 47) * 0.04;
+    const flowSpeed = 210;
+    const beadSpeed = 290;
+    const beadSpacing = 112;
+
     ctx.save();
     ctx.lineCap = "round";
+
     for (const seg of state.laserBeams) {
-      ctx.strokeStyle = `rgba(244, 63, 94, ${0.42 * flicker})`;
-      ctx.lineWidth = 9;
+      const dx = seg.x2 - seg.x1;
+      const dy = seg.y2 - seg.y1;
+      const len = Math.hypot(dx, dy);
+      if (len < 0.5) continue;
+      const ux = dx / len;
+      const uy = dy / len;
+      const baseDist = seg.distOffset || 0;
+
+      // 1. Weiche, atmende äußere Plasma-Aura
+      ctx.strokeStyle = `rgba(244, 63, 94, ${0.22 * pulse})`;
+      ctx.lineWidth = 13 + pulse * 3.5;
       ctx.beginPath();
       ctx.moveTo(seg.x1, seg.y1);
       ctx.lineTo(seg.x2, seg.y2);
       ctx.stroke();
-      ctx.strokeStyle = "#ffe4e6";
-      ctx.lineWidth = 2.6;
+
+      // 2. Mittlerer intensiver roter Strahl
+      ctx.strokeStyle = `rgba(244, 63, 94, ${0.62 * flicker})`;
+      ctx.lineWidth = 6.2 + Math.sin(t * 19 + baseDist * 0.05) * 0.9;
       ctx.beginPath();
       ctx.moveTo(seg.x1, seg.y1);
       ctx.lineTo(seg.x2, seg.y2);
       ctx.stroke();
+
+      // 3. Fließende Energie-Wellen in Strahlrichtung
+      ctx.save();
+      ctx.strokeStyle = `rgba(255, 130, 165, ${0.78 * flicker})`;
+      ctx.lineWidth = 3.8;
+      ctx.setLineDash([16, 18]);
+      ctx.lineDashOffset = -(t * flowSpeed - baseDist);
+      ctx.beginPath();
+      ctx.moveTo(seg.x1, seg.y1);
+      ctx.lineTo(seg.x2, seg.y2);
+      ctx.stroke();
+      ctx.restore();
+
+      // 4. Heißer weiß-rosa Kern
+      ctx.strokeStyle = `rgba(255, 228, 235, ${0.92 * flicker})`;
+      ctx.lineWidth = 2.1 + Math.sin(t * 25) * 0.35;
+      ctx.beginPath();
+      ctx.moveTo(seg.x1, seg.y1);
+      ctx.lineTo(seg.x2, seg.y2);
+      ctx.stroke();
+
+      // 5. Laufende Lichtimpulse (Photonen-Pakete) entlang des Strahls
+      const phase = ((t * beadSpeed - baseDist) % beadSpacing + beadSpacing) % beadSpacing;
+      for (let d = phase; d <= len; d += beadSpacing) {
+        const bx = seg.x1 + ux * d;
+        const by = seg.y1 + uy * d;
+        const tailLen = Math.min(18, d);
+        const tx = bx - ux * tailLen;
+        const ty = by - uy * tailLen;
+
+        const streakGrad = ctx.createLinearGradient(tx, ty, bx, by);
+        streakGrad.addColorStop(0, "rgba(255, 228, 235, 0)");
+        streakGrad.addColorStop(0.65, "rgba(255, 200, 215, 0.85)");
+        streakGrad.addColorStop(1, "#ffffff");
+        ctx.strokeStyle = streakGrad;
+        ctx.lineWidth = 3.4;
+        ctx.beginPath();
+        ctx.moveTo(tx, ty);
+        ctx.lineTo(bx, by);
+        ctx.stroke();
+
+        const glow = ctx.createRadialGradient(bx, by, 0, bx, by, 7.5);
+        glow.addColorStop(0, "rgba(255, 255, 255, 0.95)");
+        glow.addColorStop(0.45, "rgba(251, 113, 133, 0.65)");
+        glow.addColorStop(1, "rgba(244, 63, 94, 0)");
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(bx, by, 7.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 6. Austritts-Glühen am Emitter
+      if (seg.isStart) {
+        const er = 7 + pulse * 3;
+        const eGlow = ctx.createRadialGradient(seg.x1, seg.y1, 0, seg.x1, seg.y1, er);
+        eGlow.addColorStop(0, "rgba(255, 255, 255, 0.95)");
+        eGlow.addColorStop(0.45, "rgba(251, 113, 133, 0.7)");
+        eGlow.addColorStop(1, "rgba(244, 63, 94, 0)");
+        ctx.fillStyle = eGlow;
+        ctx.beginPath();
+        ctx.arc(seg.x1, seg.y1, er, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 7. Reflexions-Glanz am Spiegel oder Auftreffpunkt
+      if (seg.endType === "mirror") {
+        const mr = 8 + Math.sin(t * 16 + baseDist) * 2;
+        const mGlow = ctx.createRadialGradient(seg.x2, seg.y2, 0, seg.x2, seg.y2, mr);
+        mGlow.addColorStop(0, "rgba(255, 255, 255, 0.95)");
+        mGlow.addColorStop(0.4, "rgba(251, 113, 133, 0.72)");
+        mGlow.addColorStop(1, "rgba(244, 63, 94, 0)");
+        ctx.fillStyle = mGlow;
+        ctx.beginPath();
+        ctx.arc(seg.x2, seg.y2, mr, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (seg.endType === "impact" || seg.endType === "receiver") {
+        const isRec = seg.endType === "receiver";
+        const ir = (isRec ? 11 : 9) + Math.sin(t * 22 + baseDist) * 2.4;
+        const iGlow = ctx.createRadialGradient(seg.x2, seg.y2, 0, seg.x2, seg.y2, ir);
+        iGlow.addColorStop(0, "rgba(255, 255, 255, 0.95)");
+        iGlow.addColorStop(0.45, isRec ? "rgba(52, 211, 153, 0.65)" : "rgba(251, 113, 133, 0.75)");
+        iGlow.addColorStop(1, "rgba(244, 63, 94, 0)");
+        ctx.fillStyle = iGlow;
+        ctx.beginPath();
+        ctx.arc(seg.x2, seg.y2, ir, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
+
     ctx.restore();
   }
 
@@ -2129,13 +2666,22 @@
       ctx.fill();
     }
 
-    let scale = 1, alpha = 1, blurPx = 0;
+    const sinkP = m.alive
+      ? Math.max(0, Math.min(1, m.rubySinkTimer / RUBY_SINK_DUR))
+      : (m.deathType === "ruby" ? 1 : 0);
+
+    let scale = 1, alpha = 1, blurPx = 0, sinkOffsetY = 0;
     if (!m.alive) {
       const t = Math.max(0, m.deathTimer / m.deathDur);
       if (m.deathType === "water") {
         scale = 0.25 + 0.75 * t;
         alpha = Math.pow(t, 1.35);
         blurPx = (1 - t) * 9.5;
+      } else if (m.deathType === "ruby") {
+        scale = 0.12 + 0.36 * t;
+        alpha = Math.pow(t, 1.25);
+        blurPx = 1.6 + (1 - t) * 7.5;
+        sinkOffsetY = 4.5 + (1 - t) * 3.5;
       } else if (m.deathType === "laser") {
         scale = 0.3 + 0.9 * t;
         alpha = t;
@@ -2148,9 +2694,62 @@
       const t = 1 - m.spawnFade / 0.5;
       scale = 0.65 + 0.35 * t;
       alpha = 0.3 + 0.7 * t;
+    } else if (sinkP > 0) {
+      scale = 1 - sinkP * 0.52;
+      alpha = 1 - sinkP * 0.18;
+      blurPx = sinkP * 1.6;
+      sinkOffsetY = sinkP * 4.5;
+    }
+
+    // Rubinfeld-Sog & Versink-Fortschrittsring am Boden
+    if (m.alive && sinkP > 0.01) {
+      const pitR = MARBLE_RADIUS * (1.28 - sinkP * 0.22);
+      const pit = ctx.createRadialGradient(m.x, m.y + 1, 2, m.x, m.y + 1, pitR);
+      pit.addColorStop(0, `rgba(45, 6, 28, ${0.65 * sinkP})`);
+      pit.addColorStop(0.65, `rgba(131, 24, 67, ${0.42 * sinkP})`);
+      pit.addColorStop(1, "rgba(131, 24, 67, 0)");
+      ctx.fillStyle = pit;
+      ctx.beginPath();
+      ctx.arc(m.x, m.y + 1, pitR, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Sanfte Sog-Welle im Rubinfeld
+      const wavePhase = (state.animTime * (0.9 + sinkP * 1.4)) % 1;
+      ctx.save();
+      ctx.strokeStyle = `rgba(244, 114, 182, ${(1 - wavePhase) * (0.25 + sinkP * 0.45)})`;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, MARBLE_RADIUS * (0.55 + (1 - wavePhase) * 0.9), 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Verbleibende Zeit als Leuchtring um die Kugel
+      const ringR = MARBLE_RADIUS + 5.5;
+      ctx.strokeStyle = "rgba(157, 23, 77, 0.48)";
+      ctx.lineWidth = 2.6;
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, ringR, 0, Math.PI * 2);
+      ctx.stroke();
+
+      const urgentPulse = sinkP > 0.7 ? (0.65 + 0.35 * Math.sin(state.animTime * 18)) : 1;
+      ctx.strokeStyle = sinkP > 0.7
+        ? `rgba(251, 113, 133, ${0.95 * urgentPulse})`
+        : "rgba(244, 114, 182, 0.9)";
+      ctx.lineWidth = 2.8;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.arc(
+        m.x,
+        m.y,
+        ringR,
+        -Math.PI / 2,
+        -Math.PI / 2 + Math.PI * 2 * (1 - sinkP)
+      );
+      ctx.stroke();
+      ctx.restore();
     }
 
     const r = MARBLE_RADIUS * scale;
+    const drawY = m.y + sinkOffsetY;
     const pulse = 0.88 + Math.sin(state.animTime * 4.2) * 0.12;
 
     ctx.save();
@@ -2158,9 +2757,10 @@
     if (blurPx > 0.1) ctx.filter = `blur(${blurPx.toFixed(1)}px)`;
 
     if (m.alive) {
-      ctx.fillStyle = "rgba(4, 8, 28, 0.42)";
+      const shadowFade = 1 - sinkP * 0.75;
+      ctx.fillStyle = `rgba(4, 8, 28, ${(0.42 * shadowFade).toFixed(3)})`;
       ctx.beginPath();
-      ctx.ellipse(m.x + 3.5, m.y + 5.5, r * 0.96, r * 0.86, 0, 0, Math.PI * 2);
+      ctx.ellipse(m.x + 3.5 * shadowFade, drawY + 5.5 * shadowFade, r * 0.96, r * 0.86, 0, 0, Math.PI * 2);
       ctx.fill();
     }
 
@@ -2169,11 +2769,11 @@
       ctx.strokeStyle = isGold ? "rgba(253, 224, 71, 0.75)" : "rgba(125, 211, 252, 0.75)";
       ctx.lineWidth = 1.8;
       ctx.beginPath();
-      ctx.arc(m.x, m.y, r + 4.5 + Math.sin(state.animTime * 6) * 1.2, 0, Math.PI * 2);
+      ctx.arc(m.x, drawY, r + 4.5 + Math.sin(state.animTime * 6) * 1.2, 0, Math.PI * 2);
       ctx.stroke();
     }
 
-    const aura = ctx.createRadialGradient(m.x, m.y, r * 0.5, m.x, m.y, r * 1.85);
+    const aura = ctx.createRadialGradient(m.x, drawY, r * 0.5, m.x, drawY, r * 1.85);
     if (isGold) {
       aura.addColorStop(0, `rgba(251, 191, 36, ${0.42 * pulse})`);
       aura.addColorStop(0.55, `rgba(245, 158, 11, ${0.18 * pulse})`);
@@ -2185,10 +2785,10 @@
     }
     ctx.fillStyle = aura;
     ctx.beginPath();
-    ctx.arc(m.x, m.y, r * 1.85, 0, Math.PI * 2);
+    ctx.arc(m.x, drawY, r * 1.85, 0, Math.PI * 2);
     ctx.fill();
 
-    const grad = ctx.createRadialGradient(m.x - r * 0.3, m.y - r * 0.3, r * 0.08, m.x, m.y, r);
+    const grad = ctx.createRadialGradient(m.x - r * 0.3, drawY - r * 0.3, r * 0.08, m.x, drawY, r);
     if (isGold) {
       grad.addColorStop(0, "#fffbeb");
       grad.addColorStop(0.24, "#fde047");
@@ -2204,29 +2804,36 @@
     }
     ctx.fillStyle = grad;
     ctx.beginPath();
-    ctx.arc(m.x, m.y, r, 0, Math.PI * 2);
+    ctx.arc(m.x, drawY, r, 0, Math.PI * 2);
     ctx.fill();
 
     const rx = Math.sin(m.rollX) * r * 0.38;
     const ry = Math.sin(m.rollY) * r * 0.38;
-    const wisp = ctx.createRadialGradient(m.x + rx, m.y + ry, 0, m.x + rx, m.y + ry, r * 0.45);
+    const wisp = ctx.createRadialGradient(m.x + rx, drawY + ry, 0, m.x + rx, drawY + ry, r * 0.45);
     wisp.addColorStop(0, isGold ? "rgba(254, 249, 195, 0.72)" : "rgba(224, 242, 254, 0.72)");
     wisp.addColorStop(1, "rgba(255, 255, 255, 0)");
     ctx.fillStyle = wisp;
     ctx.beginPath();
-    ctx.arc(m.x + rx, m.y + ry, r * 0.45, 0, Math.PI * 2);
+    ctx.arc(m.x + rx, drawY + ry, r * 0.45, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.strokeStyle = isGold ? "rgba(254, 240, 138, 0.75)" : "rgba(186, 230, 253, 0.72)";
     ctx.lineWidth = 1.3;
     ctx.beginPath();
-    ctx.arc(m.x, m.y, r - 0.5, 0, Math.PI * 2);
+    ctx.arc(m.x, drawY, r - 0.5, 0, Math.PI * 2);
     ctx.stroke();
 
     ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
     ctx.beginPath();
-    ctx.ellipse(m.x - r * 0.34, m.y - r * 0.34, r * 0.23, r * 0.14, -Math.PI / 4, 0, Math.PI * 2);
+    ctx.ellipse(m.x - r * 0.34, drawY - r * 0.34, r * 0.23, r * 0.14, -Math.PI / 4, 0, Math.PI * 2);
     ctx.fill();
+
+    if (sinkP > 0.01) {
+      ctx.fillStyle = `rgba(131, 24, 67, ${(sinkP * 0.48).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(m.x, drawY, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     if (m.alive && m.shieldTimer > 0) {
       const warnBlink = m.shieldTimer > 3.0 || (Math.floor(state.animTime * 10) % 2 === 0);
@@ -2237,7 +2844,7 @@
         for (let i = 0; i < 6; i++) {
           const a = state.animTime * 1.5 + (i * Math.PI) / 3;
           const px = m.x + Math.cos(a) * (r + 5);
-          const py = m.y + Math.sin(a) * (r + 5);
+          const py = drawY + Math.sin(a) * (r + 5);
           if (i === 0) ctx.moveTo(px, py);
           else ctx.lineTo(px, py);
         }
@@ -2248,14 +2855,17 @@
 
     ctx.restore();
 
-    // Wasserwellen beim Versinken
-    if (!m.alive && m.deathType === "water") {
+    // Wasser- oder Rubinwellen beim Versinken
+    if (!m.alive && (m.deathType === "water" || m.deathType === "ruby")) {
       const progress = 1 - Math.max(0, m.deathTimer / m.deathDur);
+      const isRuby = m.deathType === "ruby";
       for (let i = 0; i < 3; i++) {
         const p = progress - i * 0.16;
         if (p <= 0 || p >= 1) continue;
         ctx.save();
-        ctx.strokeStyle = `rgba(165, 243, 252, ${(1 - p) * 0.65})`;
+        ctx.strokeStyle = isRuby
+          ? `rgba(244, 114, 182, ${(1 - p) * 0.72})`
+          : `rgba(165, 243, 252, ${(1 - p) * 0.65})`;
         ctx.lineWidth = 2.2 * (1 - p * 0.5);
         ctx.beginPath();
         ctx.arc(m.x, m.y, 8 + p * 34, 0, Math.PI * 2);
@@ -2361,7 +2971,17 @@
   }
 
   if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
-    navigator.serviceWorker.register("./sw.js").catch(() => {});
+    const hadController = Boolean(navigator.serviceWorker.controller);
+    let reloadingForSw = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (hadController && !reloadingForSw) {
+        reloadingForSw = true;
+        window.location.reload();
+      }
+    });
+    navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" })
+      .then((reg) => reg.update().catch(() => {}))
+      .catch(() => {});
   }
 
   // =========================================================================

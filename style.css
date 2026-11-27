@@ -524,19 +524,24 @@ canvas {
   background: rgba(24, 31, 58, 0.82);
   border: 1px solid rgba(148, 163, 184, 0.24);
   border-radius: 12px;
-  padding: 12px 14px;
+  padding: 10px 12px 12px;
   cursor: pointer;
   color: var(--text);
   display: flex;
   flex-direction: column;
   gap: 6px;
-  transition: border-color 0.15s ease, transform 0.1s ease, background 0.15s ease;
+  transition: border-color 0.15s ease, transform 0.14s cubic-bezier(0.16, 1, 0.3, 1), background 0.15s ease;
 }
 
 .level-card:hover {
   background: rgba(34, 44, 82, 0.92);
   border-color: var(--accent);
   transform: translateY(-2px);
+}
+
+.level-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .level-card.current {
@@ -546,6 +551,41 @@ canvas {
 
 .level-card.solved {
   border-color: rgba(52, 211, 153, 0.5);
+}
+
+.lc-preview-wrap {
+  width: 100%;
+  aspect-ratio: 20 / 13;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #070914;
+  border: 1px solid rgba(125, 211, 252, 0.18);
+  margin-bottom: 3px;
+  transition: border-color 0.15s ease;
+}
+
+.level-card:hover .lc-preview-wrap {
+  border-color: rgba(56, 189, 248, 0.55);
+}
+
+.level-card.current .lc-preview-wrap {
+  border-color: rgba(56, 189, 248, 0.55);
+}
+
+.level-card.solved .lc-preview-wrap {
+  border-color: rgba(52, 211, 153, 0.42);
+}
+
+.lc-preview {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.level-card:hover .lc-preview {
+  transform: scale(1.025);
 }
 
 .lc-top {

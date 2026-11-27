@@ -343,7 +343,7 @@
   });
 
   edBtnExport.addEventListener("click", () => {
-    const json = JSON.stringify(exportLevelObject());
+    const json = JSON.stringify(exportLevelObject(), null, 2);
     if (navigator.clipboard) {
       navigator.clipboard.writeText(json).then(() => {
         edStatus.textContent = "Level-JSON in die Zwischenablage kopiert!";

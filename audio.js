@@ -556,6 +556,36 @@
           osc.start(t);
           osc.stop(t + b.dur + 0.02);
         });
+      } else if (type === "ruby") {
+        if (this.noiseBuffer) {
+          const src = this.ctx.createBufferSource();
+          src.buffer = this.noiseBuffer;
+          const filter = this.ctx.createBiquadFilter();
+          filter.type = "bandpass";
+          filter.frequency.setValueAtTime(620, now);
+          filter.frequency.exponentialRampToValueAtTime(140, now + 0.42);
+          filter.Q.value = 1.8;
+          const gain = this.ctx.createGain();
+          gain.gain.setValueAtTime(0.22, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.44);
+          src.connect(filter);
+          filter.connect(gain);
+          gain.connect(out);
+          src.start(now);
+          src.stop(now + 0.46);
+        }
+
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(240, now);
+        osc.frequency.exponentialRampToValueAtTime(48, now + 0.48);
+        gain.gain.setValueAtTime(0.24, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+        osc.connect(gain);
+        gain.connect(out);
+        osc.start(now);
+        osc.stop(now + 0.52);
       } else {
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();

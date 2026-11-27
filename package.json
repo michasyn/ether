@@ -1,0 +1,16 @@
+{
+  "name": "ether",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Ätherisches Murmel- und Rätselspiel im Browser.",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "build": "node -c server.js",
+    "lint": "node -c server.js && node -c audio.js && node -c editor.js && node -c engine.js && node -c levels.js && node -c sw.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}

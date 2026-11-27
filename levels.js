@@ -12,20 +12,20 @@
     {
       name: "Erste Resonanz",
       par: 25,
-      hint: "Erwecke die 3 verborgenen Steinpaare. Spüre das rutschige Kristalleis und das dämpfende Rubinfeld.",
+      hint: "Erwecke die 3 verborgenen Steinpaare. Spüre das rutschige Kristalleis und quere das Rubinfeld zügig, bevor deine Kugel darin versinkt.",
       grid: [
         "####################",
-        "#..O.....#...iiiiO.#",
-        "#........#...iiii..#",
-        "#..##........iiii..#",
+        "#..O.....#...iiiiOi#",
+        "#........#...iiiiii#",
+        "#..##........iiiiii#",
         "#..##..............#",
         "#.......~~~........#",
         "#...S...~~~....O...#",
         "#.......~~~........#",
         "#..##..............#",
-        "#..##........rrrr..#",
-        "#........#...rrrr..#",
-        "#..O....O#...rrrrO.#",
+        "#..##........rrrrrr#",
+        "#........#...rrrrrr#",
+        "#..O....O#...rrrrOr#",
         "####################"
       ],
       links: [],
@@ -33,27 +33,28 @@
     },
     // --- LEVEL 02 ---
     {
-      name: "Brücke über der Sternenkluft",
+      name: "Eisbrücke",
       par: 35,
-      hint: "Nutze die schmale Rubinbrücke in der Mitte, um sicher auf die andere Seite zu gleiten.",
+      hint: "Nutze die schmale Eisbrücke in der Mitte – pass auf, dass Du nicht ins Wasser rutscht!",
       grid: [
         "####################",
-        "#O..ii...a...ii...O#",
-        "#..iiii..a..iiiii..#",
-        "#..iiii..a..iiiii..#",
-        "#...rr.O.a.O.rr....#",
-        "#........a.........#",
-        "#..S..rrrrrrr..O...#",
-        "#........~.........#",
-        "#..aa....~....aa...#",
-        "#..a..O..~....aa...#",
-        "#..a.....~....aa...#",
-        "#O.a.....~........O#",
-        "####################"
+        "#Oiiiiiii~~iiiiiiiO#",
+        "#iiiiiiii~~iiiiiiii#",
+        "#iiiiiiii~~iiiiiiii#",
+        "#iiiiiiOi~~iOiiiiii#",
+        "#iiiiiiii~~iiiiiiii#",
+        "#iiSiiiiiiiiiiiiiii#",
+        "#iiiiiiii~~iiiiiiii#",
+        "#iii~iiii~~iiii~iii#",
+        "#ii~~~Oii~~iiO~~~ii#",
+        "#iii~iiii~~iiii~iii#",
+        "#Oiiiiiii~~iiiiiiiO#",
+        "####################"      
       ],
       links: [],
       shards: {}
     },
+
     // --- LEVEL 03 ---
     {
       name: "Lichtbrücken & Schleusen",
@@ -112,17 +113,17 @@
       hint: "Kombiniere Lichtbrücken, Schleusen, Puls-Ladung und Phasen-Schild für alle 4 Äther-Paare.",
       grid: [
         "####################",
-        "#O.ii.#..~..#..O..1#",
-        "#..ii.#.B~..#.....E#",
-        "#..T..D..~..C..rrrr#",
-        "#.....#..~..#..rrrr#",
-        "#.....#..~..#......#",
-        "#..S..#3.~..2..O...#",
-        "#.....####..########",
-        "#..O..a........#...#",
-        "#.....a...P....D.O.#",
-        "#..O..a...B....#...#",
-        "#.....a........#..O#",
+        "#O....#ii~..###rrr1#",
+        "#.....#iB~..CO#rrrE#",
+        "#..T..Dii~..###rrrr#",
+        "#.....#ii~..#rrrrrr#",
+        "#.....#ii~..#rrrrrr#",
+        "#..S..#3i~..2rrOrrr#",
+        "#.....##############",
+        "#..O..aa......O#...#",
+        "#.....aa..P....D.O.#",
+        "#..OB.aa..B....#...#",
+        "#....Baa.......#..O#",
         "####################"
       ],
       links: [
@@ -544,7 +545,7 @@
 
     // --- LEVEL 20 (DUAL FINALE) ---
     {
-      name: "Der Kern des Äthers (Finale)",
+      name: "Der Kern des Äthers",
       par: 95,
       hint: "Das große Finale mit 5 Äther-Paaren: Baut auf beiden Seiten Lichtbrücken, meistert Gravitation und lenkt den zentralen Laser auf beide Empfänger.",
       grid: [
@@ -573,6 +574,76 @@
         { from: [11, 10], to: [15, 2], mode: "hold" }
       ],
       shards: {}
+    },
+
+    // --- LEVEL 20 ---
+    {
+      "name": "Lasershow",
+      "hint": "Schwimmen kannst du nicht! Aktiviere den Laser!",
+      "grid": [
+        "~~~~~~~~~###########",
+        "~~~~~~~~~..........#",
+        "~~~~O~~~~.....M....#",
+        "~~~~~~~~~..........#",
+        "~~~~O~~~~...M.M....#",
+        "~~~~~~~~~..........#",
+        "~~~~~~~~~.L....P.S.#",
+        "~~~~~~~~~..........#",
+        "~~~~O~~~~.M.M......#",
+        "~~~~~~~~~..........#",
+        "~~~~O~~~~...M......#",
+        "~~~~~~~~~..........#",
+        "~~~~~~~~~###########"
+      ],
+      "lasers": {"10,6": {"dir": "S","active": true}},
+      "mirrors": {
+        "12,8": "/",
+        "12,4": "/",
+        "12,10": "/",
+        "14,4": "/",
+        "14,2": "/",
+        "10,8": "\\"
+      },
+      "links": [
+        {
+          "from": [
+            15,
+            6
+          ],
+          "to": [
+            10,
+            6
+          ],
+          "mode": "hold"
+        }
+      ],
+      "shards": {}
+    },
+
+    // --- LEVEL 21 ---
+    {
+      "name": "Gemischtes Doppel (Dual)",
+      "hint": "Teamplay zwischen blau und gold!",
+      "grid": [
+        "####################",
+        "#.................K#",
+        "#..................#",
+        "#rrrrrrrrrrrrrrrrrr#",
+        "#r#b#g#b#rr#g#b#g#r#",
+        "#r#O#O#O#rr#O#O#O#r#",
+        "#r#######rr#######r#",
+        "#r#O#O#O#rr#O#O#O#r#",
+        "#r#g#b#g#rr#b#g#b#r#",
+        "#rrrrrrrrrrrrrrrrrr#",
+        "#..................#",
+        "#S.................#",
+        "####################"
+      ],
+      "lasers": {},
+      "mirrors": {},
+      "links": [],
+      "shards": {}
     }
+
   ];
 })();
