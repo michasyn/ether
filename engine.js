@@ -109,10 +109,14 @@
   const btnBackToEditor = document.getElementById("btnBackToEditor");
   const btnGyro = document.getElementById("btnGyro");
   const btnGyroCal = document.getElementById("btnGyroCal");
+  const gyroStateLabel = document.getElementById("gyroStateLabel");
   const btnFullscreen = document.getElementById("btnFullscreen");
   const btnPause = document.getElementById("btnPause");
   const btnAudio = document.getElementById("btnAudio");
   const btnRestart = document.getElementById("btnRestart");
+  const btnHelp = document.getElementById("btnHelp");
+  const btnSettings = document.getElementById("btnSettings");
+  const settingsMenu = document.getElementById("settingsMenu");
   const btnSwitchOrb = document.getElementById("btnSwitchOrb");
   const btnPickupLock = document.getElementById("btnPickupLock");
   const invSlotsWrap = document.getElementById("invSlots");
@@ -120,6 +124,8 @@
   const holoBanner = document.getElementById("holoBanner");
   const holoText = document.getElementById("holoText");
 
+  const helpModal = document.getElementById("helpModal");
+  const btnCloseHelp = document.getElementById("btnCloseHelp");
   const levelsModal = document.getElementById("levelsModal");
   const levelsGrid = document.getElementById("levelsGrid");
   const levelsProgress = document.getElementById("levelsProgress");
@@ -610,14 +616,61 @@
     levelsProgress.textContent = `${solvedCount} / ${LEVELS.length} Landschaften gelöst`;
   }
 
+  function closeSettingsMenu() {
+    settingsMenu.classList.add("hidden");
+    btnSettings.classList.remove("active");
+    btnSettings.setAttribute("aria-expanded", "false");
+  }
+
+  function toggleSettingsMenu() {
+    const isOpen = !settingsMenu.classList.contains("hidden");
+    if (isOpen) {
+      closeSettingsMenu();
+    } else {
+      settingsMenu.classList.remove("hidden");
+      btnSettings.classList.add("active");
+      btnSettings.setAttribute("aria-expanded", "true");
+    }
+  }
+
+  function openHelpModal() {
+    closeSettingsMenu();
+    if (state.mode === "playing") pauseGame();
+    helpModal.classList.remove("hidden");
+  }
+
+  function closeHelpModal() {
+    helpModal.classList.add("hidden");
+  }
+
   function openLevelsModal() {
+    closeSettingsMenu();
     if (state.mode === "playing") pauseGame();
     renderLevelsModal();
     levelsModal.classList.remove("hidden");
   }
 
+  btnSettings.addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleSettingsMenu();
+  });
+  settingsMenu.addEventListener("click", (e) => e.stopPropagation());
+  document.addEventListener("click", () => {
+    if (!settingsMenu.classList.contains("hidden")) closeSettingsMenu();
+  });
+
+  btnHelp.addEventListener("click", openHelpModal);
+  btnCloseHelp.addEventListener("click", closeHelpModal);
+  helpModal.addEventListener("click", (e) => {
+    if (e.target === helpModal) closeHelpModal();
+  });
+
   btnLevels.addEventListener("click", openLevelsModal);
+  btnEditor.addEventListener("click", closeSettingsMenu);
   btnCloseLevels.addEventListener("click", () => levelsModal.classList.add("hidden"));
+  levelsModal.addEventListener("click", (e) => {
+    if (e.target === levelsModal) levelsModal.classList.add("hidden");
+  });
 
   // =========================================================================
   // 5. LEVEL-LOADER & DUAL-KUGEL-UMSCHALTER
@@ -770,8 +823,8 @@
     updateHUD();
 
     hudLevelTag.textContent = state.customLevel
-      ? `Editor: ${def.name || "Test"}`
-      : `Level ${state.levelIndex + 1}`;
+      ? (def.name || "Editor")
+      : `${state.levelIndex + 1}`;
 
     if (keepOverlay) {
       const startHint = state.isTouchDevice
@@ -1145,12 +1198,14 @@
       state.gyroEnabled = true;
       state.gyroNeedsCal = true;
       btnGyro.classList.add("active");
-      btnGyroCal.classList.remove("hidden");
+      if (gyroStateLabel) gyroStateLabel.textContent = "Aktiv";
+      btnGyroCal.classList.remove("is-inactive");
       showHoloMessage("Neigungssteuerung aktiv. Halte das Gerät bequem – mit ⌖ jederzeit neu kalibrieren.");
     } else {
       state.gyroEnabled = false;
       btnGyro.classList.remove("active");
-      btnGyroCal.classList.add("hidden");
+      if (gyroStateLabel) gyroStateLabel.textContent = "Aus";
+      btnGyroCal.classList.add("is-inactive");
       showHoloMessage("Neigungssteuerung deaktiviert.");
     }
   }
@@ -1161,7 +1216,12 @@
   });
 
   btnGyroCal.addEventListener("click", () => {
+    if (!state.gyroEnabled) {
+      showHoloMessage("Aktiviere zuerst die Neigungssteuerung (🧭).");
+      return;
+    }
     state.gyroNeedsCal = true;
+    closeSettingsMenu();
     showHoloMessage("Neigung auf aktuelle Haltung kalibriert.");
   });
 
@@ -1318,8 +1378,11 @@
       setSensitivity(state.sensitivity + 0.1);
     } else if (e.key === "-") {
       setSensitivity(state.sensitivity - 0.1);
-    } else if (e.key === "Escape" && state.mode === "playing") {
-      pauseGame();
+    } else if (e.key === "Escape") {
+      if (!settingsMenu.classList.contains("hidden")) closeSettingsMenu();
+      else if (!helpModal.classList.contains("hidden")) closeHelpModal();
+      else if (!levelsModal.classList.contains("hidden")) levelsModal.classList.add("hidden");
+      else if (state.mode === "playing") pauseGame();
     }
   });
 

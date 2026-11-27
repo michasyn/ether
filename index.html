@@ -20,10 +20,13 @@
       <div class="brand">
         <div class="brand-orb"></div>
         <div class="brand-title">ETHER</div>
-        <span class="brand-sub" id="hudLevelTag">Level 1</span>
       </div>
 
       <div class="hud-stats">
+        <div class="stat-pill">
+          <span class="stat-label">LEVEL</span>
+          <span class="stat-value" id="hudLevelTag">1</span>
+        </div>
         <div class="stat-pill">
           <span class="stat-label">Paare</span>
           <span class="stat-value" id="hudPairs">0 / 3</span>
@@ -39,20 +42,54 @@
       </div>
 
       <div class="controls">
-        <button class="btn" id="btnLevels" title="Level-Übersicht">☰ Landschaften</button>
-        <button class="btn" id="btnEditor" title="Level-Editor öffnen">✎ Editor</button>
-        <button class="btn btn-back-editor hidden" id="btnBackToEditor">← Editor</button>
-        <button class="btn" id="btnGyro" title="Neigungssteuerung (Gyroskop) ein/aus">🧭</button>
-        <button class="btn hidden" id="btnGyroCal" title="Neigung neu kalibrieren">⌖</button>
-        <label class="sens-wrap" title="Empfindlichkeit (+ / -)">
-          Sens
-          <input type="range" id="sensSlider" min="0.4" max="2.4" step="0.1" value="1.0" />
-          <span id="sensValue">1.0×</span>
-        </label>
-        <button class="btn" id="btnFullscreen" title="Vollbild ein/aus">⛶</button>
-        <button class="btn" id="btnPause" title="Pause (ESC)">⏸</button>
-        <button class="btn" id="btnAudio" title="Ton an/aus">🔊</button>
-        <button class="btn" id="btnRestart" title="Neustart (R)">↻</button>
+        <button class="btn btn-back-editor hidden" id="btnBackToEditor" type="button">← Editor</button>
+        <button class="btn btn-top-icon" id="btnFullscreen" type="button" title="Vollbild ein/aus" aria-label="Vollbild ein/aus">⛶</button>
+        <button class="btn btn-top-icon" id="btnPause" type="button" title="Pause (ESC)" aria-label="Pause">⏸</button>
+        <button class="btn btn-top-icon" id="btnAudio" type="button" title="Ton ein/aus" aria-label="Ton ein/aus">🔊</button>
+        <button class="btn btn-top-icon" id="btnRestart" type="button" title="Zurücksetzen (R)" aria-label="Zurücksetzen">↻</button>
+        <button class="btn btn-top-icon" id="btnHelp" type="button" title="Hilfe &amp; Steuerung" aria-label="Hilfe">?</button>
+        <div class="settings-wrap">
+          <button class="btn btn-top-icon" id="btnSettings" type="button" title="Einstellungen" aria-label="Einstellungen" aria-haspopup="true" aria-expanded="false">⚙</button>
+          <div class="settings-menu hidden" id="settingsMenu" role="menu" aria-label="Einstellungen">
+            <div class="settings-header">Einstellungen</div>
+            <button class="menu-item" id="btnLevels" type="button" role="menuitem">
+              <span class="menu-icon" aria-hidden="true">☰</span>
+              <span class="menu-label">Landschaften</span>
+            </button>
+            <button class="menu-item" id="btnEditor" type="button" role="menuitem">
+              <span class="menu-icon" aria-hidden="true">✎</span>
+              <span class="menu-label">Editor</span>
+            </button>
+            <div class="menu-divider"></div>
+            <button class="menu-item" id="btnGyro" type="button" role="menuitem">
+              <span class="menu-icon" aria-hidden="true">🧭</span>
+              <span class="menu-label">Neigungssteuerung</span>
+              <span class="menu-state" id="gyroStateLabel">Aus</span>
+            </button>
+            <button class="menu-item is-inactive" id="btnGyroCal" type="button" role="menuitem">
+              <span class="menu-icon" aria-hidden="true">⌖</span>
+              <span class="menu-label">Neigung kalibrieren</span>
+            </button>
+            <div class="menu-divider"></div>
+            <div class="menu-slider-row">
+              <div class="menu-slider-head">
+                <span class="menu-icon" aria-hidden="true">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="4" y1="6" x2="20" y2="6"></line>
+                    <circle cx="9" cy="6" r="2.5" fill="currentColor"></circle>
+                    <line x1="4" y1="12" x2="20" y2="12"></line>
+                    <circle cx="15" cy="12" r="2.5" fill="currentColor"></circle>
+                    <line x1="4" y1="18" x2="20" y2="18"></line>
+                    <circle cx="11" cy="18" r="2.5" fill="currentColor"></circle>
+                  </svg>
+                </span>
+                <label class="menu-label" for="sensSlider">Sensitivität</label>
+                <span class="menu-state" id="sensValue">1.0×</span>
+              </div>
+              <input type="range" id="sensSlider" min="0.4" max="2.4" step="0.1" value="1.0" />
+            </div>
+          </div>
+        </div>
       </div>
     </header>
 
@@ -91,13 +128,44 @@
         <div class="inv-slots" id="invSlots"></div>
         <button class="btn btn-action" id="btnUseItem" title="Aktives Item nutzen (Linksklick / Leertaste)">Aktivieren</button>
       </div>
-
-      <div class="hints">
-        <span>Desktop: <kbd>Klick</kbd> Maus sperren · <kbd>L-Klick</kbd>/<kbd>Space</kbd> Item · <kbd>R-Klick</kbd>/<kbd>Tab</kbd> Wechseln · <kbd>Q</kbd> Dual-Kugel</span>
-        <span class="sep">|</span>
-        <span>Touch: Wischen oder <kbd>🧭</kbd> Kippen</span>
-      </div>
     </footer>
+  </div>
+
+  <!-- MODAL: HILFE & STEUERUNG -->
+  <div class="modal-backdrop hidden" id="helpModal">
+    <div class="modal-panel help-panel">
+      <div class="modal-header">
+        <div>
+          <h3>Hilfe &amp; Steuerung</h3>
+          <span class="modal-sub">Steuerung, Tastenkürzel und Spielhinweise</span>
+        </div>
+        <button class="btn" id="btnCloseHelp" type="button" aria-label="Hilfe schließen">✕</button>
+      </div>
+      <div class="help-sections">
+        <section class="help-section">
+          <h4>Desktop-Steuerung</h4>
+          <ul class="help-list">
+            <li><span class="help-keys"><kbd>Klick</kbd></span><span>Maus auf dem Spielfeld sperren (direkte Steuerung)</span></li>
+            <li><span class="help-keys"><kbd>WASD</kbd> / <kbd>↑↓←→</kbd></span><span>Kugel alternativ per Tastatur rollen</span></li>
+            <li><span class="help-keys"><kbd>L-Klick</kbd> / <kbd>Space</kbd></span><span>Aktives Item aus dem Inventar nutzen</span></li>
+            <li><span class="help-keys"><kbd>R-Klick</kbd> / <kbd>Tab</kbd></span><span>Aktiven Inventar-Slot wechseln (auch per Mausrad)</span></li>
+            <li><span class="help-keys"><kbd>Q</kbd> / <kbd>Shift</kbd></span><span>Zwischen Blauer &amp; Goldener Kugel wechseln (Dual-Modus)</span></li>
+            <li><span class="help-keys"><kbd>R</kbd> · <kbd>ESC</kbd> · <kbd>+</kbd>/<kbd>-</kbd></span><span>Zurücksetzen · Pause · Sensitivität anpassen</span></li>
+          </ul>
+        </section>
+        <section class="help-section">
+          <h4>Touch &amp; Mobil</h4>
+          <ul class="help-list">
+            <li><span class="help-keys"><kbd>Wischen</kbd></span><span>Kugel direkt über das Spielfeld beschleunigen</span></li>
+            <li><span class="help-keys"><kbd>⚙</kbd> → <kbd>🧭</kbd> / <kbd>⌖</kbd></span><span>Neigungssteuerung (Gyroskop) aktivieren &amp; kalibrieren</span></li>
+          </ul>
+        </section>
+        <section class="help-section">
+          <h4>Spielhinweise</h4>
+          <p class="help-note">Erwecke alle verborgenen Äther-Steinpaare nacheinander. Nach 3 Sekunden Stillstand leuchten übrige geschlossene Steine kurz auf. Quere Rubinfelder zügig, bevor deine Kugel darin versinkt – der Phasen-Schild schützt vor Wasser, Kluft, Laser, Rubinfeld und Puls-Ladung.</p>
+        </section>
+      </div>
+    </div>
   </div>
 
   <!-- MODAL: LEVEL-ÜBERSICHT -->
