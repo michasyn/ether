@@ -1,6 +1,6 @@
 {
-  "name": "ETHER",
-  "short_name": "ETHER",
+  "name": "ETHERBALL",
+  "short_name": "ETHERBALL",
   "description": "Ätherisches Murmel- und Rätselspiel im Browser.",
   "start_url": "./index.html",
   "display": "standalone",

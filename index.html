@@ -8,9 +8,9 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/svg+xml" href="icon.svg" />
-  <title>ETHER</title>
+  <title>ETHERBALL</title>
   <meta name="description" content="Ätherisches Murmel- und Rätselspiel im Browser." />
-  <meta property="og:title" content="ETHER" />
+  <meta property="og:title" content="ETHERBALL" />
   <meta property="og:description" content="Ätherisches Murmel- und Rätselspiel im Browser." />
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -19,7 +19,7 @@
     <header class="topbar">
       <div class="brand">
         <div class="brand-orb"></div>
-        <div class="brand-title">ETHER</div>
+        <div class="brand-title">ETHERBALL</div>
       </div>
 
       <div class="controls">
@@ -108,13 +108,13 @@
       <canvas id="gameCanvas" width="960" height="624"></canvas>
 
       <div class="holo-banner hidden" id="holoBanner">
-        <div class="holo-tag">ETHER-SYSTEM</div>
+        <div class="holo-tag">ETHERBALL-SYSTEM</div>
         <div class="holo-text" id="holoText"></div>
       </div>
 
       <div class="overlay" id="overlay">
         <div class="overlay-card">
-          <h2 id="overlayTitle">Willkommen in ETHER</h2>
+          <h2 id="overlayTitle">Willkommen in ETHERBALL</h2>
           <p id="overlayText"></p>
           <div class="overlay-actions">
             <button class="btn btn-primary" id="btnOverlayPrimary">Spielen</button>
@@ -154,7 +154,7 @@
           </span>
           <span class="stat-value" id="hudTime">00:00.0</span>
         </div>
-        <div class="stat-pill shield-pill hidden" id="shieldPill" title="Schild" aria-label="Schild">
+        <div class="stat-pill shield-pill hidden" id="shieldPill" title="Phasen-Schild (schützt vor Wasser, Kluft, Laser, Rubinfeld, Atomar-Steinen &amp; Puls-Ladung)" aria-label="Schild">
           <span class="stat-icon" aria-hidden="true">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M12 3l7 3v5c0 4.8-3 8.8-7 10-4-1.2-7-5.2-7-10V6l7-3z"></path>
@@ -205,7 +205,7 @@
         </section>
         <section class="help-section">
           <h4>Spielhinweise</h4>
-          <p class="help-note">Erwecke alle verborgenen Äther-Steinpaare nacheinander. Nach 3 Sekunden Stillstand leuchten übrige geschlossene Steine kurz auf. Quere Rubinfelder zügig, bevor deine Kugel darin versinkt – der Phasen-Schild schützt vor Wasser, Kluft, Laser, Rubinfeld und Puls-Ladung.</p>
+          <p class="help-note">Erwecke alle verborgenen Äther-Steinpaare nacheinander. Nach 3 Sekunden Stillstand leuchten übrige geschlossene Steine kurz auf. Quere Rubinfelder zügig, bevor deine Kugel darin versinkt, nutze Flipper-Platten für kräftige Rückstöße und meide strahlende Atomar-Steine – der Phasen-Schild schützt vor Wasser, Kluft, Laser, Rubinfeld, Atomar-Steinen und Puls-Ladung.</p>
         </section>
       </div>
     </div>

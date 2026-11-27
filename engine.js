@@ -27,6 +27,11 @@
   const LASER_DEATH_DUR = 0.55;
   const RUBY_SINK_DUR = 4.0;
   const RUBY_DEATH_DUR = 0.55;
+  const ATOMIC_DEATH_DUR = 0.72;
+  const ATOMIC_GRAZE_TOLERANCE = 0.22;
+  const ATOMIC_DIRECT_IMPACT = 95;
+  const ATOMIC_CORNER_IMPACT = 135;
+  const FLIPPER_KICK_SPEED = 740;
   const MAX_INVENTORY = 7;
   const MAX_LIVES = 5;
   const GRAVITY_RADIUS = TILE * 3.6;
@@ -41,6 +46,7 @@
     red:      { name: "Rubinfeld",    friction: 6.40, control: 0.65, dot: "#f472b6" },
     bridge:   { name: "Lichtbrücke",  friction: 2.20, control: 1.00, dot: "#22d3ee" },
     plate:    { name: "Sensor-Platte",friction: 2.35, control: 1.00, dot: "#a78bfa" },
+    flipper:  { name: "Flipper",      friction: 2.35, control: 1.00, dot: "#fb923c" },
     water:    { name: "Tiefenwasser", friction: 4.00, control: 0.20, dot: "#06b6d4" },
     abyss:    { name: "Sternenkluft", friction: 0.00, control: 0.00, dot: "#312e81" }
   };
@@ -154,6 +160,7 @@
     stones: [],
     oxydList: [],
     plates: [],
+    flippers: [],
     lasers: [],
     receivers: [],
     gravityCores: [],
@@ -194,6 +201,8 @@
       rollX: 0, rollY: 0,
       alive: true,
       shieldTimer: 0,
+      shieldDeflectFlash: 0,
+      atomicGrazeTimer: 0,
       rubySinkTimer: 0,
       deathType: null,
       deathTimer: 0,
@@ -345,20 +354,34 @@
           pctx.strokeRect(px + 0.35, py + 0.35, T - 0.7, T - 0.7);
         }
 
-        // Sensor-Platte
+        // Sensor-Platte & Flipper-Platte
         if (ch === "P") {
           pctx.fillStyle = "rgba(167, 139, 250, 0.28)";
           pctx.fillRect(px + 2, py + 2, T - 4, T - 4);
           pctx.strokeStyle = "#a78bfa";
           pctx.lineWidth = 1.2;
           pctx.strokeRect(px + 2.5, py + 2.5, T - 5, T - 5);
+        } else if (ch === "F") {
+          pctx.fillStyle = "rgba(249, 115, 22, 0.34)";
+          pctx.beginPath();
+          pctx.arc(cx, cy, T * 0.34, 0, Math.PI * 2);
+          pctx.fill();
+          pctx.strokeStyle = "#f97316";
+          pctx.lineWidth = 1.4;
+          pctx.beginPath();
+          pctx.arc(cx, cy, T * 0.34, 0, Math.PI * 2);
+          pctx.stroke();
+          pctx.fillStyle = "#fde047";
+          pctx.beginPath();
+          pctx.arc(cx, cy, 1.8, 0, Math.PI * 2);
+          pctx.fill();
         }
 
         // 2. Steine, Tore & Mechaniken (Extra-Kugel "E" bewusst als Spoiler-Schutz ausgeblendet)
         if (ch === "#" || ch === "C") {
           const g = pctx.createLinearGradient(px, py, px + T, py + T);
-          g.addColorStop(0, ch === "C" ? "#563b75" : "#3f3970");
-          g.addColorStop(1, ch === "C" ? "#2e1f45" : "#22254a");
+          g.addColorStop(0, "#3f3970");
+          g.addColorStop(1, "#22254a");
           pctx.fillStyle = g;
           pctx.fillRect(px, py, T, T);
           pctx.fillStyle = "rgba(167, 139, 250, 0.42)";
@@ -368,14 +391,24 @@
           pctx.fillRect(px, py + T - 1.5, T, 1.5);
           pctx.fillRect(px + T - 1.5, py, 1.5, T);
           if (ch === "C") {
-            pctx.strokeStyle = "#fbbf24";
-            pctx.lineWidth = 1.3;
+            pctx.strokeStyle = "rgba(196, 181, 253, 0.45)";
+            pctx.lineWidth = 1.1;
             pctx.beginPath();
-            pctx.moveTo(px + 3, py + 3);
+            pctx.moveTo(px + 2.5, py + 3);
+            pctx.lineTo(cx + 0.5, cy + 0.5);
+            pctx.lineTo(px + T - 2, py + 4.5);
+            pctx.moveTo(cx + 0.5, cy + 0.5);
+            pctx.lineTo(px + 4.5, py + T - 2);
+            pctx.stroke();
+
+            pctx.strokeStyle = "#080a18";
+            pctx.lineWidth = 1.4;
+            pctx.beginPath();
+            pctx.moveTo(px + 2, py + 2.5);
             pctx.lineTo(cx, cy);
-            pctx.lineTo(px + T - 3, py + 5);
+            pctx.lineTo(px + T - 2.5, py + 4);
             pctx.moveTo(cx, cy);
-            pctx.lineTo(px + 5, py + T - 3);
+            pctx.lineTo(px + 4, py + T - 2.5);
             pctx.stroke();
           }
         } else if (ch === "O") {
@@ -416,6 +449,16 @@
           pctx.fillStyle = "#e9d5ff";
           pctx.fillRect(px + 4, cy - 2, T - 8, 1.4);
           pctx.fillRect(px + 4, cy + 1, T - 8, 1.4);
+        } else if (ch === "A") {
+          pctx.fillStyle = "#243018";
+          pctx.fillRect(px, py, T, T);
+          pctx.strokeStyle = "#a3e635";
+          pctx.lineWidth = 1.1;
+          pctx.strokeRect(px + 1, py + 1, T - 2, T - 2);
+          pctx.fillStyle = "#bef264";
+          pctx.beginPath();
+          pctx.arc(cx, cy, 2.8, 0, Math.PI * 2);
+          pctx.fill();
         } else if (ch === "T") {
           pctx.fillStyle = "#1e1b4b";
           pctx.fillRect(px + 1, py + 1, T - 2, T - 2);
@@ -718,6 +761,7 @@
     state.stones = [];
     state.oxydList = [];
     state.plates = [];
+    state.flippers = [];
     state.lasers = [];
     state.receivers = [];
     state.gravityCores = [];
@@ -759,10 +803,15 @@
         else if (ch === "P") {
           floor = "plate";
           state.plates.push({ x, y, pressed: false });
+        } else if (ch === "F") {
+          floor = "flipper";
+          state.flippers.push({ x, y, pulse: 0, cooldown: 0 });
         } else if (ch === "#") {
           stone = { type: "wall", x, y };
+        } else if (ch === "A") {
+          stone = { type: "atomic", x, y };
         } else if (ch === "C") {
-          stone = { type: "cracked", x, y };
+          stone = { type: "cracked", x, y, laserHeat: 0 };
         } else if (ch === "B") {
           stone = { type: "stasis", x, y, pushCooldown: 0 };
         } else if (ch === "W") {
@@ -868,6 +917,8 @@
     m.vy = 0;
     m.alive = true;
     m.shieldTimer = 0;
+    m.shieldDeflectFlash = 0;
+    m.atomicGrazeTimer = 0;
     m.rubySinkTimer = 0;
     m.deathType = null;
     m.deathTimer = 0;
@@ -982,6 +1033,15 @@
 
         if (allowEffects && st.type === "oxyd" && st.status === "closed" && st.cooldown <= 0) {
           handleOxydHit(st);
+        } else if (allowEffects && state.mode === "playing" && st.type === "cracked") {
+          st.laserHeat = (st.laserHeat || 0) + FIXED_DT;
+          if (Math.random() < 0.45) {
+            spawnParticles(ex, ey, "#fb7185", 2, 110, 2.2);
+            spawnParticles(ex, ey, "#fbbf24", 1, 90, 2.0);
+          }
+          if (st.laserHeat >= 0.08) {
+            shatterCrackedWall(cx, cy, true);
+          }
         }
         break;
       }
@@ -1076,6 +1136,20 @@
     useInventoryItemAt(0);
   }
 
+  function shatterCrackedWall(tx, ty, fromLaser = false) {
+    state.stones[ty][tx] = null;
+    const cx = (tx + 0.5) * TILE;
+    const cy = (ty + 0.5) * TILE;
+    if (fromLaser) {
+      audio.playPulseDetonate(getPan(cx, cy));
+      spawnParticles(cx, cy, "#fb7185", 16, 190, 3.6);
+      spawnParticles(cx, cy, "#fbbf24", 12, 165, 3.0);
+    }
+    spawnParticles(cx, cy, "#4c4682", 14, 175, 4.4, "shard");
+    spawnParticles(cx, cy, "#22254a", 12, 145, 3.8, "shard");
+    spawnParticles(cx, cy, "#a78bfa", 10, 140, 2.8);
+  }
+
   function detonateCharge(charge) {
     const cx = (charge.tx + 0.5) * TILE;
     const cy = (charge.ty + 0.5) * TILE;
@@ -1091,8 +1165,7 @@
         if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS) continue;
         const st = state.stones[ny][nx];
         if (st && st.type === "cracked") {
-          state.stones[ny][nx] = null;
-          spawnParticles((nx + 0.5) * TILE, (ny + 0.5) * TILE, "#c084fc", 18, 150, 3.5);
+          shatterCrackedWall(nx, ny, false);
         }
       }
     }
@@ -1454,18 +1527,27 @@
   function spawnParticles(x, y, color, count, speed = 130, size = 3.5, style = "dot") {
     for (let i = 0; i < count; i++) {
       const ang = Math.random() * Math.PI * 2;
-      const spd = (0.3 + Math.random() * 0.85) * speed;
-      const maxLife = style === "bubble" ? (0.55 + Math.random() * 0.45) : (0.35 + Math.random() * 0.35);
+      const spd = (style === "shard" ? (0.45 + Math.random() * 0.95) : (0.3 + Math.random() * 0.85)) * speed;
+      const maxLife = style === "bubble"
+        ? (0.55 + Math.random() * 0.45)
+        : (style === "shard"
+          ? (0.55 + Math.random() * 0.35)
+          : (style === "sparkle" ? (0.28 + Math.random() * 0.34) : (0.35 + Math.random() * 0.35)));
+      const offsetR = style === "shard"
+        ? Math.random() * (MARBLE_RADIUS * 0.8)
+        : (style === "sparkle" ? (3 + Math.random() * (MARBLE_RADIUS * 0.85)) : 0);
       state.particles.push({
-        x: x + (style === "bubble" ? (Math.random() - 0.5) * 18 : 0),
-        y: y + (style === "bubble" ? (Math.random() - 0.5) * 18 : 0),
-        vx: Math.cos(ang) * spd * (style === "bubble" ? 0.35 : 1),
-        vy: Math.sin(ang) * spd * (style === "bubble" ? 0.35 : 1) - (style === "bubble" ? 24 : 0),
+        x: x + (style === "bubble" ? (Math.random() - 0.5) * 18 : Math.cos(ang) * offsetR),
+        y: y + (style === "bubble" ? (Math.random() - 0.5) * 18 : Math.sin(ang) * offsetR),
+        vx: Math.cos(ang) * spd * (style === "bubble" ? 0.35 : (style === "sparkle" ? 0.4 : 1)),
+        vy: Math.sin(ang) * spd * (style === "bubble" ? 0.35 : (style === "sparkle" ? 0.4 : 1)) - (style === "bubble" ? 24 : 0),
         life: maxLife,
         maxLife,
         color,
         size: size * (0.6 + Math.random() * 0.8),
-        style
+        style,
+        rot: Math.random() * Math.PI * 2,
+        vrot: style === "sparkle" ? (Math.random() - 0.5) * 3.2 : (Math.random() - 0.5) * 14
       });
     }
   }
@@ -1581,7 +1663,7 @@
     if (nx <= 0 || nx >= COLS - 1 || ny <= 0 || ny >= ROWS - 1) return;
 
     const target = state.stones[ny][nx];
-    if (target && ["oxyd", "laser", "receiver", "terminal", "gate", "phaseGate", "gravity"].includes(target.type)) {
+    if (target && ["oxyd", "laser", "receiver", "terminal", "gate", "phaseGate", "gravity", "atomic"].includes(target.type)) {
       return;
     }
 
@@ -1651,8 +1733,10 @@
       const p = state.particles[i];
       p.x += p.vx * dt;
       p.y += p.vy * dt;
-      p.vx *= Math.exp(-3.0 * dt);
-      p.vy *= Math.exp(-3.0 * dt);
+      const drag = p.style === "shard" ? 2.1 : (p.style === "sparkle" ? 4.2 : 3.0);
+      p.vx *= Math.exp(-drag * dt);
+      p.vy *= Math.exp(-drag * dt);
+      if (p.style === "shard" || p.style === "sparkle") p.rot += p.vrot * dt;
       p.life -= dt;
       if (p.life <= 0) state.particles.splice(i, 1);
     }
@@ -1739,6 +1823,7 @@
 
       if (m.spawnFade > 0) m.spawnFade = Math.max(0, m.spawnFade - dt);
       if (m.shieldTimer > 0) m.shieldTimer = Math.max(0, m.shieldTimer - dt);
+      if (m.shieldDeflectFlash > 0) m.shieldDeflectFlash = Math.max(0, m.shieldDeflectFlash - dt * 4.5);
 
       const floorType = getFloorAt(m.x, m.y);
       const fp = (m.shieldTimer > 0 && (floorType === "water" || floorType === "abyss" || floorType === "red"))
@@ -1813,6 +1898,18 @@
         }
       }
 
+      // Leichtes eisiges Glitzern beim Rutschen über Kristalleis
+      if (floorType === "ice" && spd > 22) {
+        const iceRate = Math.min(26, 6 + spd * 0.045);
+        if (Math.random() < dt * iceRate) {
+          const backX = m.x - (m.vx / spd) * 6;
+          const backY = m.y - (m.vy / spd) * 6;
+          const glintColors = ["#ffffff", "#e0f2fe", "#a5f3fc"];
+          const col = glintColors[Math.floor(Math.random() * glintColors.length)];
+          spawnParticles(backX, backY, col, 1, 34, 3.3, "sparkle");
+        }
+      }
+
       // Zwei-Pass-Kollision gegen feste Kacheln
       const minTx = Math.max(0, Math.floor((m.x - MARBLE_RADIUS) / TILE) - 1);
       const maxTx = Math.min(COLS - 1, Math.floor((m.x + MARBLE_RADIUS) / TILE) + 1);
@@ -1820,6 +1917,9 @@
       const maxTy = Math.min(ROWS - 1, Math.floor((m.y + MARBLE_RADIUS) / TILE) + 1);
 
       let maxImpact = 0;
+      let touchedAtomic = false;
+      let atomicDirectHit = false;
+      let atomicCornerOnly = true;
       const hitEvents = [];
 
       for (let pass = 0; pass < 2; pass++) {
@@ -1871,16 +1971,64 @@
               m.y += ny * pen;
 
               const vn = m.vx * nx + m.vy * ny;
+              let impact = 0;
               if (vn < 0) {
-                const impact = -vn;
+                impact = -vn;
                 m.vx -= (1 + RESTITUTION) * vn * nx;
                 m.vy -= (1 + RESTITUTION) * vn * ny;
                 if (impact > maxImpact) maxImpact = impact;
                 hitEvents.push({ stone, nx, ny, impact });
               }
+
+              if (stone.type === "atomic") {
+                touchedAtomic = true;
+                if (isCardinal) atomicCornerOnly = false;
+                const killThreshold = isCardinal ? ATOMIC_DIRECT_IMPACT : ATOMIC_CORNER_IMPACT;
+                if (impact >= killThreshold) atomicDirectHit = true;
+              }
             }
           }
         }
+      }
+
+      if (touchedAtomic) {
+        if (m.shieldTimer <= 0) {
+          const grazeRate = atomicCornerOnly ? 0.55 : 1.0;
+          m.atomicGrazeTimer += dt * grazeRate;
+          if (atomicDirectHit || m.atomicGrazeTimer >= ATOMIC_GRAZE_TOLERANCE) {
+            m.alive = false;
+            m.deathType = "atomic";
+            m.deathDur = ATOMIC_DEATH_DUR;
+            m.deathTimer = ATOMIC_DEATH_DUR;
+            m.atomicGrazeTimer = 0;
+            m.vx = 0;
+            m.vy = 0;
+            const pan = getPan(m.x, m.y);
+            audio.updateSurfaceSound("standard", 0, pan, false);
+            audio.playHazard("atomic", pan);
+            const isGoldMarble = m.colorType === "gold";
+            spawnParticles(m.x, m.y, isGoldMarble ? "#fde047" : "#7dd3fc", 14, 175, 4.4, "shard");
+            spawnParticles(m.x, m.y, isGoldMarble ? "#d97706" : "#2563eb", 12, 145, 3.8, "shard");
+            spawnParticles(m.x, m.y, "#bef264", 16, 190, 3.2, "dot");
+            spawnParticles(m.x, m.y, "#ecfccb", 8, 120, 2.4, "dot");
+            return;
+          } else if (Math.random() < dt * 26) {
+            // Warnfunken bei leichtem Streifen im Toleranzbereich
+            spawnParticles(m.x, m.y, "#a3e635", 2, 85, 2.2);
+          }
+        } else {
+          m.atomicGrazeTimer = 0;
+          m.shieldDeflectFlash = 1.0;
+          if (maxImpact > 45 && state.wallSoundCooldown <= 0) {
+            audio.playShieldDeflect(getPan(m.x, m.y));
+            spawnParticles(m.x, m.y, "#34d399", 8, 125, 2.6);
+            spawnParticles(m.x, m.y, "#a3e635", 5, 95, 2.1);
+          } else if (Math.random() < dt * 22) {
+            spawnParticles(m.x, m.y, "#34d399", 2, 75, 2.1);
+          }
+        }
+      } else if (m.atomicGrazeTimer > 0) {
+        m.atomicGrazeTimer = Math.max(0, m.atomicGrazeTimer - dt * 3.5);
       }
 
       if (maxImpact > 45 && state.wallSoundCooldown <= 0) {
@@ -2005,6 +2153,64 @@
       }
     }
 
+    // Flipper-Bodenplatten auswerten (Flipper-Bumper-Rückstoß)
+    for (const fl of state.flippers) {
+      if (fl.cooldown > 0) fl.cooldown = Math.max(0, fl.cooldown - dt);
+      if (fl.pulse > 0) fl.pulse = Math.max(0, fl.pulse - dt * 4.2);
+
+      const cx = (fl.x + 0.5) * TILE;
+      const cy = (fl.y + 0.5) * TILE;
+      const triggerR = TILE * 0.52;
+
+      for (const m of state.marbles) {
+        if (!m.alive || fl.cooldown > 0) continue;
+        const dx = m.x - cx;
+        const dy = m.y - cy;
+        const dist = Math.hypot(dx, dy);
+        if (dist < triggerR) {
+          let dirX, dirY;
+          if (dist > 2.5) {
+            dirX = dx / dist;
+            dirY = dy / dist;
+          } else {
+            const spd = Math.hypot(m.vx, m.vy);
+            if (spd > 15) {
+              dirX = -m.vx / spd;
+              dirY = -m.vy / spd;
+            } else {
+              const randA = Math.random() * Math.PI * 2;
+              dirX = Math.cos(randA);
+              dirY = Math.sin(randA);
+            }
+          }
+          const jitter = (Math.random() - 0.5) * 0.26;
+          const cosJ = Math.cos(jitter);
+          const sinJ = Math.sin(jitter);
+          const kx = dirX * cosJ - dirY * sinJ;
+          const ky = dirX * sinJ + dirY * cosJ;
+
+          const tx = -ky;
+          const ty = kx;
+          const vt = (m.vx * tx + m.vy * ty) * 0.25;
+          m.vx = kx * FLIPPER_KICK_SPEED + tx * vt;
+          m.vy = ky * FLIPPER_KICK_SPEED + ty * vt;
+
+          const newSpd = Math.hypot(m.vx, m.vy);
+          if (newSpd > MAX_SPEED) {
+            m.vx = (m.vx / newSpd) * MAX_SPEED;
+            m.vy = (m.vy / newSpd) * MAX_SPEED;
+          }
+
+          fl.cooldown = 0.16;
+          fl.pulse = 1.0;
+          const pan = getPan(cx, cy);
+          audio.playFlipperKick(pan);
+          spawnParticles(cx, cy, "#fb923c", 14, 210, 3.2);
+          spawnParticles(cx, cy, "#fef08a", 8, 165, 2.4);
+        }
+      }
+    }
+
     // Gefahren (Laser, Wasser, Abgrund, Rubinfeld) für alle Kugeln prüfen
     for (const m of state.marbles) {
       if (!m.alive) continue;
@@ -2083,7 +2289,7 @@
     const x = tx * TILE;
     const y = ty * TILE;
 
-    if (type === "standard" || type === "plate") {
+    if (type === "standard" || type === "plate" || type === "flipper") {
       const alt = (tx + ty) % 2 === 0;
       const grad = ctx.createLinearGradient(x, y, x + TILE, y + TILE);
       grad.addColorStop(0, alt ? "#1e2242" : "#1a1f3c");
@@ -2105,6 +2311,71 @@
         ctx.beginPath();
         ctx.arc(x + TILE / 2, y + TILE / 2, 7, 0, Math.PI * 2);
         ctx.stroke();
+      } else if (type === "flipper") {
+        const fl = state.flippers.find((f) => f.x === tx && f.y === ty);
+        const kick = fl ? fl.pulse : 0;
+        const idle = 0.5 + 0.5 * Math.sin(state.animTime * 4.2 + tx * 0.7 + ty * 0.9);
+        const cx = x + TILE / 2;
+        const cy = y + TILE / 2;
+        const outerR = 14 + kick * 3.2;
+
+        ctx.save();
+
+        // Expandierende Stoßwelle beim Auslösen
+        if (kick > 0.02) {
+          const waveR = 13 + (1 - kick) * 15;
+          ctx.strokeStyle = `rgba(254, 240, 138, ${kick * 0.85})`;
+          ctx.lineWidth = 2.6 * kick;
+          ctx.beginPath();
+          ctx.arc(cx, cy, waveR, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        // Rundes, orange hervortretendes Flipper-Element auf normaler Bodenplatte
+        const bumperGrad = ctx.createRadialGradient(cx, cy, 2, cx, cy, outerR);
+        bumperGrad.addColorStop(0, kick > 0.15 ? "rgba(254, 240, 138, 0.72)" : `rgba(251, 146, 60, ${0.42 + idle * 0.14})`);
+        bumperGrad.addColorStop(0.7, kick > 0.15 ? "rgba(249, 115, 22, 0.55)" : `rgba(234, 88, 12, ${0.28 + idle * 0.1})`);
+        bumperGrad.addColorStop(1, "rgba(194, 65, 12, 0.12)");
+        ctx.fillStyle = bumperGrad;
+        ctx.beginPath();
+        ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Leuchtender Flipper-Bumper-Ring
+        ctx.shadowColor = kick > 0.1 ? "#fef08a" : "#f97316";
+        ctx.shadowBlur = 7 + kick * 10;
+        ctx.strokeStyle = kick > 0.15 ? "#fef08a" : "#f97316";
+        ctx.lineWidth = 2.8 + kick * 1.1;
+        ctx.beginPath();
+        ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // 4 nach außen gerichtete Abstoß-Pfeile (Chevrons)
+        ctx.strokeStyle = kick > 0.15 ? "#ffffff" : "#fde047";
+        ctx.lineWidth = 1.7;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        for (let i = 0; i < 4; i++) {
+          const a = (i * Math.PI) / 2 + Math.PI / 4;
+          const rTip = 10.5 + kick * 2.4;
+          const rBase = 6.5 + kick * 1.4;
+          const pxTip = cx + Math.cos(a) * rTip;
+          const pyTip = cy + Math.sin(a) * rTip;
+          const aL = a - 0.34;
+          const aR = a + 0.34;
+          ctx.beginPath();
+          ctx.moveTo(cx + Math.cos(aL) * rBase, cy + Math.sin(aL) * rBase);
+          ctx.lineTo(pxTip, pyTip);
+          ctx.lineTo(cx + Math.cos(aR) * rBase, cy + Math.sin(aR) * rBase);
+          ctx.stroke();
+        }
+
+        // Glühender Federkern in der Mitte
+        ctx.fillStyle = kick > 0.1 ? "#ffffff" : "#fb923c";
+        ctx.beginPath();
+        ctx.arc(cx, cy, 4.4 + kick * 1.8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
       } else if (alt) {
         ctx.fillStyle = "rgba(125, 211, 252, 0.08)";
         ctx.beginPath();
@@ -2363,8 +2634,8 @@
 
     if (stone.type === "wall" || stone.type === "cracked") {
       const grad = ctx.createLinearGradient(x, y, x + TILE, y + TILE);
-      grad.addColorStop(0, stone.type === "cracked" ? "#4c3568" : "#3b3568");
-      grad.addColorStop(1, stone.type === "cracked" ? "#2e1f45" : "#22254a");
+      grad.addColorStop(0, "#3b3568");
+      grad.addColorStop(1, "#22254a");
       ctx.fillStyle = grad;
       ctx.fillRect(x, y, TILE, TILE);
       ctx.fillStyle = "rgba(167, 139, 250, 0.42)";
@@ -2375,24 +2646,164 @@
       ctx.fillRect(x + TILE - 4, y, 4, TILE);
       ctx.fillStyle = "rgba(24, 28, 58, 0.72)";
       ctx.fillRect(x + 6, y + 6, TILE - 12, TILE - 12);
+      ctx.strokeStyle = "rgba(125, 211, 252, 0.16)";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x + 6.5, y + 6.5, TILE - 13, TILE - 13);
 
       if (stone.type === "cracked") {
-        ctx.strokeStyle = "#fbbf24";
-        ctx.lineWidth = 2;
+        const heat = Math.min(1, (stone.laserHeat || 0) / 0.08);
+        ctx.save();
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+
+        // Ausgebrochene Kerben am Rand der brüchigen Wand
+        ctx.fillStyle = "#0b0d1f";
         ctx.beginPath();
-        ctx.moveTo(x + 10, y + 10);
-        ctx.lineTo(x + 24, y + 22);
-        ctx.lineTo(x + 18, y + 36);
-        ctx.moveTo(x + 24, y + 22);
-        ctx.lineTo(x + 38, y + 16);
-        ctx.moveTo(x + 24, y + 22);
-        ctx.lineTo(x + 34, y + 38);
+        ctx.moveTo(x + 12, y);
+        ctx.lineTo(x + 17, y);
+        ctx.lineTo(x + 14.5, y + 5);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(x + TILE, y + 17);
+        ctx.lineTo(x + TILE, y + 22);
+        ctx.lineTo(x + TILE - 5, y + 19.5);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(x + 27, y + TILE);
+        ctx.lineTo(x + 33, y + TILE);
+        ctx.lineTo(x + 29.5, y + TILE - 5.5);
+        ctx.closePath();
+        ctx.fill();
+
+        // Haupt- und Nebenrisse als Funktion für Lichtkante + tiefen Bruch
+        const tracePrimaryCracks = (ox, oy) => {
+          ctx.beginPath();
+          ctx.moveTo(x + 14.5 + ox, y + 3.5 + oy);
+          ctx.lineTo(x + 18 + ox, y + 13 + oy);
+          ctx.lineTo(x + 24 + ox, y + 21 + oy);
+          ctx.lineTo(x + 21 + ox, y + 31 + oy);
+          ctx.lineTo(x + 29.5 + ox, y + 43 + oy);
+
+          ctx.moveTo(x + 24 + ox, y + 21 + oy);
+          ctx.lineTo(x + 34 + ox, y + 18 + oy);
+          ctx.lineTo(x + 43.5 + ox, y + 19.5 + oy);
+
+          ctx.moveTo(x + 21 + ox, y + 31 + oy);
+          ctx.lineTo(x + 12 + ox, y + 35 + oy);
+          ctx.lineTo(x + 5 + ox, y + 39 + oy);
+        };
+
+        const traceHairlineCracks = (ox, oy) => {
+          ctx.beginPath();
+          ctx.moveTo(x + 18 + ox, y + 13 + oy);
+          ctx.lineTo(x + 9 + ox, y + 16 + oy);
+          ctx.moveTo(x + 34 + ox, y + 18 + oy);
+          ctx.lineTo(x + 37 + ox, y + 10 + oy);
+          ctx.moveTo(x + 25 + ox, y + 35 + oy);
+          ctx.lineTo(x + 36 + ox, y + 34 + oy);
+        };
+
+        // Helle Bruchkante (Relief-Effekt im Wand-Farbton)
+        ctx.strokeStyle = heat > 0.05
+          ? `rgba(254, 205, 211, ${0.55 + heat * 0.45})`
+          : "rgba(196, 181, 253, 0.36)";
+        ctx.lineWidth = 1.5;
+        tracePrimaryCracks(1.1, 1.1);
         ctx.stroke();
-      } else {
-        ctx.strokeStyle = "rgba(125, 211, 252, 0.16)";
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x + 6.5, y + 6.5, TILE - 13, TILE - 13);
+
+        ctx.lineWidth = 1.0;
+        traceHairlineCracks(0.9, 0.9);
+        ctx.stroke();
+
+        // Tiefe dunkle Steinrisse (oder glühend bei Laser-Treffer)
+        if (heat > 0.05) {
+          ctx.shadowColor = "#fb7185";
+          ctx.shadowBlur = 10 * heat;
+          ctx.strokeStyle = "#fda4af";
+        } else {
+          ctx.strokeStyle = "#080a18";
+        }
+        ctx.lineWidth = 2.4;
+        tracePrimaryCracks(0, 0);
+        ctx.stroke();
+
+        ctx.lineWidth = 1.35;
+        traceHairlineCracks(0, 0);
+        ctx.stroke();
+
+        // Kleiner abgesplitterter Steinkern am zentralen Rissknoten
+        ctx.fillStyle = heat > 0.05 ? "#fb7185" : "#0b0e20";
+        ctx.beginPath();
+        ctx.moveTo(x + 22, y + 19.5);
+        ctx.lineTo(x + 26.5, y + 20.5);
+        ctx.lineTo(x + 24.5, y + 24.5);
+        ctx.lineTo(x + 21, y + 22.5);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.restore();
       }
+    } else if (stone.type === "atomic") {
+      const pulse = 0.72 + 0.28 * Math.sin(state.animTime * 4.5 + stone.x * 0.9 + stone.y * 0.6);
+
+      // Leicht glühende radioaktive Wand-Kachel
+      const grad = ctx.createLinearGradient(x, y, x + TILE, y + TILE);
+      grad.addColorStop(0, "#2c3820");
+      grad.addColorStop(1, "#161d12");
+      ctx.fillStyle = grad;
+      ctx.fillRect(x, y, TILE, TILE);
+
+      // Kanten-Bevel mit dezentem Strahlen-Schimmer
+      ctx.fillStyle = `rgba(190, 242, 100, ${0.32 + 0.16 * pulse})`;
+      ctx.fillRect(x, y, TILE, 3);
+      ctx.fillRect(x, y, 3, TILE);
+      ctx.fillStyle = "#0b0f09";
+      ctx.fillRect(x, y + TILE - 3.5, TILE, 3.5);
+      ctx.fillRect(x + TILE - 3.5, y, 3.5, TILE);
+
+      // Dunkle Innenkammer mit grün-gelbem Strahlungs-Glow
+      ctx.fillStyle = "#10160d";
+      ctx.fillRect(x + 5, y + 5, TILE - 10, TILE - 10);
+
+      const glow = ctx.createRadialGradient(cx, cy, 2, cx, cy, TILE * 0.48);
+      glow.addColorStop(0, `rgba(190, 242, 100, ${0.32 * pulse})`);
+      glow.addColorStop(0.55, `rgba(132, 204, 22, ${0.14 * pulse})`);
+      glow.addColorStop(1, "rgba(132, 204, 22, 0)");
+      ctx.fillStyle = glow;
+      ctx.fillRect(x + 3, y + 3, TILE - 6, TILE - 6);
+
+      ctx.strokeStyle = `rgba(163, 230, 53, ${0.42 + 0.28 * pulse})`;
+      ctx.lineWidth = 1.2;
+      ctx.strokeRect(x + 5.5, y + 5.5, TILE - 11, TILE - 11);
+
+      // Glühendes Strahlenwarnzeichen (Trefoil)
+      ctx.save();
+      ctx.shadowColor = `rgba(190, 242, 100, ${0.9 * pulse})`;
+      ctx.shadowBlur = 7 + 5 * pulse;
+      ctx.fillStyle = pulse > 0.85 ? "#d9f99d" : "#bef264";
+
+      // Drei 60°-Strahlungsflügel im 120°-Abstand (ISO-Orientierung)
+      const innerR = 5.2;
+      const outerR = 13.5;
+      const bladeStarts = [-Math.PI / 3, Math.PI / 3, Math.PI];
+      for (const a0 of bladeStarts) {
+        const a1 = a0 + Math.PI / 3;
+        ctx.beginPath();
+        ctx.arc(cx, cy, outerR, a0, a1);
+        ctx.arc(cx, cy, innerR, a1, a0, true);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // Zentraler Kernpunkt
+      ctx.beginPath();
+      ctx.arc(cx, cy, 3.1, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
     } else if (stone.type === "stasis") {
       ctx.fillStyle = "#1e293b";
       ctx.fillRect(x + 3, y + 3, TILE - 6, TILE - 6);
@@ -2770,6 +3181,13 @@
         scale = 0.3 + 0.9 * t;
         alpha = t;
         blurPx = (1 - t) * 6;
+      } else if (m.deathType === "atomic") {
+        // Kurzes Aufblitzen beim Zerfall in kleine Teile, dann aufgelöst
+        if (t < 0.84) return;
+        const flashT = (t - 0.84) / 0.16;
+        scale = 1.0 + (1 - flashT) * 0.25;
+        alpha = flashT;
+        blurPx = (1 - flashT) * 5;
       } else {
         scale = 0.12 + 0.88 * t;
         alpha = t;
@@ -2921,19 +3339,26 @@
 
     if (m.alive && m.shieldTimer > 0) {
       const warnBlink = m.shieldTimer > 3.0 || (Math.floor(state.animTime * 10) % 2 === 0);
-      if (warnBlink) {
-        ctx.strokeStyle = "#34d399";
-        ctx.lineWidth = 2.4;
+      if (warnBlink || m.shieldDeflectFlash > 0) {
+        const flash = m.shieldDeflectFlash || 0;
+        ctx.save();
+        ctx.strokeStyle = flash > 0.15 ? "#a7f3d0" : "#34d399";
+        ctx.lineWidth = 2.4 + flash * 1.8;
+        if (flash > 0.05) {
+          ctx.shadowColor = "#34d399";
+          ctx.shadowBlur = 10 * flash;
+        }
         ctx.beginPath();
         for (let i = 0; i < 6; i++) {
           const a = state.animTime * 1.5 + (i * Math.PI) / 3;
-          const px = m.x + Math.cos(a) * (r + 5);
-          const py = drawY + Math.sin(a) * (r + 5);
+          const px = m.x + Math.cos(a) * (r + 5 + flash * 1.5);
+          const py = drawY + Math.sin(a) * (r + 5 + flash * 1.5);
           if (i === 0) ctx.moveTo(px, py);
           else ctx.lineTo(px, py);
         }
         ctx.closePath();
         ctx.stroke();
+        ctx.restore();
       }
     }
 
@@ -3013,6 +3438,39 @@
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
         ctx.stroke();
+      } else if (p.style === "shard") {
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot || 0);
+        ctx.fillStyle = p.color;
+        const s = p.size * (0.45 + 0.55 * a);
+        ctx.beginPath();
+        ctx.moveTo(-s, -s * 0.45);
+        ctx.lineTo(s * 0.9, -s * 0.2);
+        ctx.lineTo(s * 0.35, s * 0.85);
+        ctx.lineTo(-s * 0.65, s * 0.55);
+        ctx.closePath();
+        ctx.fill();
+      } else if (p.style === "sparkle") {
+        const twinkle = Math.sin(a * Math.PI);
+        ctx.globalAlpha = twinkle * 0.92;
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot || 0);
+        const s = p.size * (0.55 + 0.65 * twinkle);
+        const w = s * 0.24;
+        ctx.shadowColor = "#bae6fd";
+        ctx.shadowBlur = 5;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.moveTo(0, -s);
+        ctx.lineTo(w, -w);
+        ctx.lineTo(s, 0);
+        ctx.lineTo(w, w);
+        ctx.lineTo(0, s);
+        ctx.lineTo(-w, w);
+        ctx.lineTo(-s, 0);
+        ctx.lineTo(-w, -w);
+        ctx.closePath();
+        ctx.fill();
       } else {
         ctx.fillStyle = p.color;
         ctx.beginPath();

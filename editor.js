@@ -34,10 +34,12 @@
     { id: "~", label: "Wasser",     color: "#0e7490" },
     { id: "a", label: "Kluft",      color: "#050714" },
     { id: "B", label: "Stasis",     color: "#0369a1" },
-    { id: "C", label: "Riss-Wand",  color: "#f59e0b" },
+    { id: "C", label: "Riss-Wand",  color: "#3b3568" },
+    { id: "A", label: "☢ Atomar",   color: "#365314" },
     { id: "W", label: "Tauscher",   color: "#a855f7" },
     { id: "T", label: "Terminal",   color: "#fb7185" },
     { id: "P", label: "Platte",     color: "#8b5cf6" },
+    { id: "F", label: "◎ Flipper",  color: "#c2410c" },
     { id: "D", label: "Schleuse",   color: "#38bdf8" },
     { id: "L", label: "Laser (↻)",  color: "#f43f5e" },
     { id: "M", label: "Spiegel (↻)",color: "#e0f2fe" },
@@ -73,7 +75,7 @@
     grid[10][14] = "O";
     return {
       name: "Eigene Landschaft",
-      hint: "Selbst entworfene Landschaft aus dem ETHER-Editor.",
+      hint: "Selbst entworfene Landschaft aus dem ETHERBALL-Editor.",
       grid,
       lasers: {},
       mirrors: {},
@@ -272,12 +274,70 @@
         const py = y * T;
         const tool = TOOLS.find((t) => t.id === ch);
 
-        edCtx.fillStyle = tool ? tool.color : "#1e2242";
+        edCtx.fillStyle = ch === "F" ? "#1e2242" : (tool ? tool.color : "#1e2242");
         edCtx.fillRect(px, py, T, T);
         edCtx.strokeStyle = "rgba(255,255,255,0.1)";
         edCtx.strokeRect(px + 0.5, py + 0.5, T - 1, T - 1);
 
-        if (ch !== "." && ch !== "#") {
+        if (ch === "A") {
+          const cx = px + T / 2;
+          const cy = py + T / 2;
+          edCtx.strokeStyle = "#a3e635";
+          edCtx.lineWidth = 1.5;
+          edCtx.strokeRect(px + 2, py + 2, T - 4, T - 4);
+          edCtx.fillStyle = "#bef264";
+          for (const a0 of [-Math.PI / 3, Math.PI / 3, Math.PI]) {
+            edCtx.beginPath();
+            edCtx.arc(cx, cy, 11, a0, a0 + Math.PI / 3);
+            edCtx.arc(cx, cy, 4.2, a0 + Math.PI / 3, a0, true);
+            edCtx.closePath();
+            edCtx.fill();
+          }
+          edCtx.beginPath();
+          edCtx.arc(cx, cy, 2.4, 0, Math.PI * 2);
+          edCtx.fill();
+        } else if (ch === "F") {
+          const cx = px + T / 2;
+          const cy = py + T / 2;
+          edCtx.fillStyle = "rgba(249, 115, 22, 0.34)";
+          edCtx.beginPath();
+          edCtx.arc(cx, cy, 11.5, 0, Math.PI * 2);
+          edCtx.fill();
+          edCtx.strokeStyle = "#f97316";
+          edCtx.lineWidth = 2.4;
+          edCtx.beginPath();
+          edCtx.arc(cx, cy, 11.5, 0, Math.PI * 2);
+          edCtx.stroke();
+          edCtx.fillStyle = "#fde047";
+          edCtx.beginPath();
+          edCtx.arc(cx, cy, 3.6, 0, Math.PI * 2);
+          edCtx.fill();
+        } else if (ch === "C") {
+          edCtx.fillStyle = "rgba(24, 28, 58, 0.65)";
+          edCtx.fillRect(px + 5, py + 5, T - 10, T - 10);
+          edCtx.strokeStyle = "rgba(196, 181, 253, 0.45)";
+          edCtx.lineWidth = 1.4;
+          edCtx.beginPath();
+          edCtx.moveTo(px + 13, py + 3);
+          edCtx.lineTo(px + 20, py + 18);
+          edCtx.lineTo(px + 24, py + 36);
+          edCtx.moveTo(px + 20, py + 18);
+          edCtx.lineTo(px + 36, py + 15);
+          edCtx.moveTo(px + 18, py + 25);
+          edCtx.lineTo(px + 6, py + 31);
+          edCtx.stroke();
+          edCtx.strokeStyle = "#080a18";
+          edCtx.lineWidth = 2.0;
+          edCtx.beginPath();
+          edCtx.moveTo(px + 12, py + 2);
+          edCtx.lineTo(px + 19, py + 17);
+          edCtx.lineTo(px + 23, py + 35);
+          edCtx.moveTo(px + 19, py + 17);
+          edCtx.lineTo(px + 35, py + 14);
+          edCtx.moveTo(px + 17, py + 24);
+          edCtx.lineTo(px + 5, py + 30);
+          edCtx.stroke();
+        } else if (ch !== "." && ch !== "#") {
           edCtx.fillStyle = "#ffffff";
           edCtx.font = "bold 14px system-ui, sans-serif";
           edCtx.textAlign = "center";

@@ -592,6 +592,80 @@
       osc.stop(now + 0.37);
     }
 
+    playShieldDeflect(pan) {
+      if (this.muted || !this.ctx) return;
+      const now = this.ctx.currentTime;
+      const out = this.createPanner(pan);
+      [640, 960].forEach((freq, idx) => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = idx === 0 ? "triangle" : "sine";
+        osc.frequency.setValueAtTime(freq, now);
+        osc.frequency.exponentialRampToValueAtTime(freq * 1.24, now + 0.11);
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.linearRampToValueAtTime(idx === 0 ? 0.12 : 0.08, now + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+        osc.connect(gain);
+        gain.connect(out);
+        osc.start(now);
+        osc.stop(now + 0.15);
+      });
+    }
+
+    playFlipperKick(pan) {
+      if (this.muted || !this.ctx) return;
+      const now = this.ctx.currentTime;
+      const out = this.createPanner(pan);
+
+      // 1. Kräftiger Flipper-Magnet-Impuls (Solenoid-Kick)
+      const thump = this.ctx.createOscillator();
+      const thumpGain = this.ctx.createGain();
+      thump.type = "triangle";
+      thump.frequency.setValueAtTime(240, now);
+      thump.frequency.exponentialRampToValueAtTime(72, now + 0.085);
+      thumpGain.gain.setValueAtTime(0.32, now);
+      thumpGain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+      thump.connect(thumpGain);
+      thumpGain.connect(out);
+      thump.start(now);
+      thump.stop(now + 0.11);
+
+      // 2. Metallisches Bumper-Ping (Flipper-Glocke/Feder)
+      [580, 1140].forEach((baseFreq, idx) => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = idx === 0 ? "sine" : "triangle";
+        osc.frequency.setValueAtTime(baseFreq, now);
+        osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.48, now + 0.065);
+        osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.22, now + 0.19);
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.linearRampToValueAtTime(idx === 0 ? 0.18 : 0.09, now + 0.008);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.21);
+        osc.connect(gain);
+        gain.connect(out);
+        osc.start(now);
+        osc.stop(now + 0.22);
+      });
+
+      // 3. Kurzer mechanischer Schnapp-Transient
+      if (this.noiseBuffer) {
+        const src = this.ctx.createBufferSource();
+        src.buffer = this.noiseBuffer;
+        const hp = this.ctx.createBiquadFilter();
+        hp.type = "bandpass";
+        hp.frequency.setValueAtTime(2600, now);
+        hp.Q.value = 1.4;
+        const nGain = this.ctx.createGain();
+        nGain.gain.setValueAtTime(0.22, now);
+        nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.032);
+        src.connect(hp);
+        hp.connect(nGain);
+        nGain.connect(out);
+        src.start(now);
+        src.stop(now + 0.036);
+      }
+    }
+
     playPulseArm(pan) {
       if (this.muted || !this.ctx) return;
       const now = this.ctx.currentTime;
@@ -740,6 +814,58 @@
         gain.connect(out);
         osc.start(now);
         osc.stop(now + 0.52);
+      } else if (type === "atomic") {
+        // Geiger-Zähler-Knacken + radioaktives Zerfallen
+        const clicks = [0.0, 0.032, 0.068, 0.115, 0.175, 0.25];
+        clicks.forEach((delay, idx) => {
+          const t = now + delay;
+          const cOsc = this.ctx.createOscillator();
+          const cGain = this.ctx.createGain();
+          cOsc.type = "square";
+          cOsc.frequency.setValueAtTime(2400 - idx * 140, t);
+          cOsc.frequency.exponentialRampToValueAtTime(620, t + 0.018);
+          cGain.gain.setValueAtTime(0.16, t);
+          cGain.gain.exponentialRampToValueAtTime(0.001, t + 0.02);
+          cOsc.connect(cGain);
+          cGain.connect(out);
+          cOsc.start(t);
+          cOsc.stop(t + 0.024);
+        });
+
+        if (this.noiseBuffer) {
+          const src = this.ctx.createBufferSource();
+          src.buffer = this.noiseBuffer;
+          const filter = this.ctx.createBiquadFilter();
+          filter.type = "bandpass";
+          filter.frequency.setValueAtTime(3200, now);
+          filter.frequency.exponentialRampToValueAtTime(420, now + 0.52);
+          filter.Q.value = 1.9;
+          const nGain = this.ctx.createGain();
+          nGain.gain.setValueAtTime(0.28, now);
+          nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+          src.connect(filter);
+          filter.connect(nGain);
+          nGain.connect(out);
+          src.start(now);
+          src.stop(now + 0.58);
+        }
+
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(420, now);
+        osc.frequency.exponentialRampToValueAtTime(72, now + 0.46);
+        const lp = this.ctx.createBiquadFilter();
+        lp.type = "lowpass";
+        lp.frequency.setValueAtTime(1600, now);
+        lp.frequency.exponentialRampToValueAtTime(240, now + 0.46);
+        gain.gain.setValueAtTime(0.18, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.48);
+        osc.connect(lp);
+        lp.connect(gain);
+        gain.connect(out);
+        osc.start(now);
+        osc.stop(now + 0.5);
       } else {
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();

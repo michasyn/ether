@@ -194,7 +194,7 @@
     {
       name: "Quanten-Konvergenz",
       par: 75,
-      hint: "Meistere alle Systeme von ETHER: Laser-Optik, Gravitations-Kerne, Phasen-Tauscher, Lichtbrücke, Puls-Ladung und Phasen-Schild.",
+      hint: "Meistere alle Systeme von ETHERBALL: Laser-Optik, Gravitations-Kerne, Phasen-Tauscher, Lichtbrücke, Puls-Ladung und Phasen-Schild.",
       grid: [
         "####################",
         "#O..#....L.....#..O#",
@@ -338,6 +338,50 @@
       shards: {}
     },
 
+    {
+      "name": "Die drei Schleusen",
+      "hint": "Das Impuls-Terminal schaltet zwei Schleusen gleichzeitig. Schiebe die Stasis-Quader auf die Sensor-Platten.",
+      "grid": [
+        "####################",
+        "#O..#....O.....#..O#",
+        "#...D..........D...#",
+        "#...#..T....P..#...#",
+        "#AAAAAAA....AAAAAAA#",
+        "#........~~........#",
+        "#..S..B..~~..B..O..#",
+        "#........~~........#",
+        "#AAAAAAA....AAAAAAA#",
+        "#...#....P.....#...#",
+        "#...D..........D...#",
+        "#O..#..O....O..#..O#",
+        "####################"
+      ],
+      "lasers": {},
+      "mirrors": {},
+      "links": [
+        {"from": [7,3],
+          "to": [4,2],
+          "mode": "toggle"
+        },
+        {
+          "from": [7,3],
+          "to": [15,10],
+          "mode": "toggle"
+        },
+        {
+          "from": [12,3],
+          "to": [15,2],
+          "mode": "hold"
+        },
+        {
+          "from": [9,9],
+          "to": [4,10],
+          "mode": "hold"
+        }
+      ],
+      "shards": {}
+    },
+
     // --- LEVEL 13 ---
     {
       name: "Spiegelkabinett",
@@ -388,7 +432,7 @@
         "#...ii...a...ii....#",
         "#....rrrr.rrrr.....#",
         "#..O.....a.....O...#",
-        "#..S..X..r..G...2..#",
+        "###S..X..r..G...2###",
         "#..O.....a.....O...#",
         "#....rrrr.rrrr.....#",
         "#...ii...a...ii....#",
@@ -639,6 +683,31 @@
         "#S.................#",
         "####################"
       ],
+      "lasers": {},
+      "mirrors": {},
+      "links": [],
+      "shards": {}
+    },
+
+    // --- LEVEL 22 ---
+    {
+      "name": "Flipper",
+      "hint": "Lass Dich nicht herumschubsen!",
+      "grid": [
+        "~~~~~~~~~~~~~~~~~~~~",
+          "~...~~~~~~~~~~~~...~",
+          "~.O.~~~~~~~~~~~~.O.~",
+          "~...~~~~~~~~~~~~...~",
+          "~...############...~",
+          "~...F...FFFF...F...~",
+          "~.S...F......F...2.~",
+          "~...F...FFFF...F...~",
+          "~...############...~",
+          "~...~~~~~~~~~~~~...~",
+          "~.O.~~~~~~~~~~~~.O.~",
+          "~.~~~~~~~~~~~~~~...~",
+          "~~~~~~~~~~~~~~~~~~~~"
+            ],
       "lasers": {},
       "mirrors": {},
       "links": [],

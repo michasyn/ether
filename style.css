@@ -948,7 +948,9 @@ canvas {
 
 @media (max-width: 440px) {
   .topbar { padding: 5px 7px; gap: 4px; }
-  .brand-title { font-size: 0.85rem; letter-spacing: 0.1em; }
+  .brand { gap: 5px; }
+  .brand-orb { width: 16px; height: 16px; }
+  .brand-title { font-size: 0.78rem; letter-spacing: 0.06em; }
   .topbar:has(#btnBackToEditor:not(.hidden)) .brand-title { display: none; }
   .btn-top-icon {
     width: 32px;
