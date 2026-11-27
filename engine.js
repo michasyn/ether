@@ -32,6 +32,7 @@
   const ATOMIC_DIRECT_IMPACT = 95;
   const ATOMIC_CORNER_IMPACT = 135;
   const FLIPPER_KICK_SPEED = 740;
+  const INTRO_DURATION = 3.0;
   const MAX_INVENTORY = 7;
   const MAX_LIVES = 5;
   const GRAVITY_RADIUS = TILE * 3.6;
@@ -92,7 +93,12 @@
   // =========================================================================
   const stageWrap = document.querySelector(".stage-wrap");
   const canvas = document.getElementById("gameCanvas");
-  const ctx = canvas.getContext("2d");
+  const mainCtx = canvas.getContext("2d");
+  let ctx = mainCtx;
+  const introCanvas = document.createElement("canvas");
+  introCanvas.width = WORLD_W;
+  introCanvas.height = WORLD_H;
+  const introCtx = introCanvas.getContext("2d");
   const audio = new SoundEngine();
 
   const overlay = document.getElementById("overlay");
@@ -189,7 +195,9 @@
     gyroZeroGamma: 0,
     wallSoundCooldown: 0,
     idleTimer: 0,
-    winSeq: null
+    winSeq: null,
+    introAnim: null,
+    resumeIntro: false
   };
 
   function createMarble(colorType, sx, sy) {
@@ -683,7 +691,7 @@
 
   function openHelpModal() {
     closeSettingsMenu();
-    if (state.mode === "playing") pauseGame();
+    if (state.mode === "playing" || state.mode === "intro") pauseGame();
     helpModal.classList.remove("hidden");
   }
 
@@ -693,7 +701,7 @@
 
   function openLevelsModal() {
     closeSettingsMenu();
-    if (state.mode === "playing") pauseGame();
+    if (state.mode === "playing" || state.mode === "intro") pauseGame();
     renderLevelsModal();
     levelsModal.classList.remove("hidden");
   }
@@ -779,6 +787,8 @@
     state.holoTimer = 0;
     state.idleTimer = 0;
     state.winSeq = null;
+    state.introAnim = null;
+    state.resumeIntro = false;
     holoBanner.classList.add("hidden");
 
     let blueSpawn = { x: 2.5 * TILE, y: 6.5 * TILE };
@@ -1329,8 +1339,103 @@
     }
   }
 
+  function captureIntroBoard() {
+    introCtx.clearRect(0, 0, WORLD_W, WORLD_H);
+    const prevCtx = ctx;
+    ctx = introCtx;
+    try {
+      for (let y = 0; y < ROWS; y++) {
+        for (let x = 0; x < COLS; x++) {
+          drawFloorTile(x, y, state.floors[y][x]);
+        }
+      }
+      for (const m of state.marbles) {
+        ctx.strokeStyle = m.colorType === "gold" ? "rgba(251, 191, 36, 0.28)" : "rgba(125, 211, 252, 0.28)";
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.arc(m.spawnX, m.spawnY, 13, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      for (let y = 0; y < ROWS; y++) {
+        for (let x = 0; x < COLS; x++) {
+          const it = state.items[y][x];
+          if (it) drawItem(x, y, it);
+        }
+      }
+      for (let y = 0; y < ROWS; y++) {
+        for (let x = 0; x < COLS; x++) {
+          const st = state.stones[y][x];
+          if (st) drawStone(st);
+        }
+      }
+    } finally {
+      ctx = prevCtx;
+    }
+  }
+
+  function beginLevelIntro() {
+    hideOverlay();
+    state.mode = "intro";
+    state.resumeIntro = false;
+    state.pendingMouseX = 0;
+    state.pendingMouseY = 0;
+    state.idleTimer = 0;
+
+    captureIntroBoard();
+
+    const pattern = (state.levelIndex + Math.floor(Math.random() * 4)) % 4;
+    const midX = (COLS - 1) * 0.5;
+    const midY = (ROWS - 1) * 0.5;
+    const maxDist = Math.hypot(midX, midY);
+    const tiles = [];
+
+    for (let ty = 0; ty < ROWS; ty++) {
+      for (let tx = 0; tx < COLS; tx++) {
+        const dx = tx - midX;
+        const dy = ty - midY;
+        const distNorm = Math.hypot(dx, dy) / maxDist;
+        const angleNorm = (Math.atan2(dy, dx) + Math.PI) / (Math.PI * 2);
+
+        let waveOrder = distNorm;
+        if (pattern === 1) waveOrder = 1 - distNorm;
+        else if (pattern === 2) waveOrder = (tx / (COLS - 1) + ty / (ROWS - 1)) * 0.5;
+        else if (pattern === 3) waveOrder = (distNorm * 0.65 + angleNorm * 0.35);
+
+        const order = Math.max(0, Math.min(1, waveOrder * 0.68 + Math.random() * 0.32));
+        const delay = order * 1.48;
+        const dur = 0.92 + Math.random() * 0.22;
+
+        // Flugrichtung des einzelnen Mosaik-Spielsteins von außen zur Zielposition
+        const baseAng = (Math.abs(dx) < 0.01 && Math.abs(dy) < 0.01)
+          ? Math.random() * Math.PI * 2
+          : Math.atan2(dy, dx);
+        const flyAng = baseAng + (Math.random() - 0.5) * 0.95;
+        const flyDist = 115 + Math.random() * 145;
+
+        tiles.push({
+          tx,
+          ty,
+          delay,
+          dur,
+          ox: Math.cos(flyAng) * flyDist,
+          oy: Math.sin(flyAng) * flyDist,
+          rot: (Math.random() - 0.5) * 1.55,
+          startScale: 0.22 + Math.random() * 0.16
+        });
+      }
+    }
+
+    state.introAnim = {
+      elapsed: 0,
+      duration: INTRO_DURATION,
+      portrait: state.isPortrait,
+      tiles
+    };
+  }
+
   function pauseGame() {
-    if (state.mode !== "playing") return;
+    if (state.mode !== "playing" && state.mode !== "intro") return;
+    state.resumeIntro = (state.mode === "intro");
     state.mode = "paused";
     audio.updateSurfaceSound("standard", 0, 0, false);
     audio.updateLaserSound(false, 0, 0);
@@ -1354,17 +1459,26 @@
     if (state.mode === "won") {
       if (state.customLevel) loadLevelData(state.customLevel, false);
       else loadLevel((state.levelIndex + 1) % LEVELS.length, false);
+      beginLevelIntro();
       audio.playNewLevel();
       engagePointerLock();
     } else if (state.mode === "gameover") {
       reloadCurrentLevel(true);
+      beginLevelIntro();
+      audio.playNewLevel();
+      engagePointerLock();
+    } else if (state.mode === "ready") {
+      beginLevelIntro();
       audio.playNewLevel();
       engagePointerLock();
     } else {
-      const isFreshStart = (state.mode === "ready");
       hideOverlay();
-      state.mode = "playing";
-      if (isFreshStart) audio.playNewLevel();
+      if (state.resumeIntro && state.introAnim) {
+        state.mode = "intro";
+      } else {
+        state.mode = "playing";
+      }
+      state.resumeIntro = false;
       engagePointerLock();
     }
   }
@@ -1377,7 +1491,7 @@
   });
 
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden && state.mode === "playing") pauseGame();
+    if (document.hidden && (state.mode === "playing" || state.mode === "intro")) pauseGame();
   });
 
   document.addEventListener("mousemove", (e) => {
@@ -1475,6 +1589,7 @@
     } else if (e.key === "r" || e.key === "R") {
       audio.init();
       reloadCurrentLevel(true);
+      beginLevelIntro();
       audio.playNewLevel();
       engagePointerLock();
     } else if (e.key === "+" || e.key === "=") {
@@ -1485,7 +1600,7 @@
       if (!settingsMenu.classList.contains("hidden")) closeSettingsMenu();
       else if (!helpModal.classList.contains("hidden")) closeHelpModal();
       else if (!levelsModal.classList.contains("hidden")) levelsModal.classList.add("hidden");
-      else if (state.mode === "playing") pauseGame();
+      else if (state.mode === "playing" || state.mode === "intro") pauseGame();
     }
   });
 
@@ -1495,16 +1610,18 @@
   btnOverlaySecondary.addEventListener("click", () => {
     audio.init();
     reloadCurrentLevel(true);
+    beginLevelIntro();
     audio.playNewLevel();
     engagePointerLock();
   });
   btnPause.addEventListener("click", () => {
-    if (state.mode === "playing") pauseGame();
+    if (state.mode === "playing" || state.mode === "intro") pauseGame();
     else if (state.mode === "paused" || state.mode === "ready") startOrResume();
   });
   btnRestart.addEventListener("click", () => {
     audio.init();
     reloadCurrentLevel(true);
+    beginLevelIntro();
     audio.playNewLevel();
     engagePointerLock();
   });
@@ -1770,6 +1887,22 @@
           const extraMsg = seq.extraMsg;
           state.winSeq = null;
           finishLevelWin(extraMsg);
+        }
+      }
+      return;
+    }
+
+    if (state.mode === "intro" && state.introAnim) {
+      state.introAnim.elapsed += dt;
+      if (state.introAnim.elapsed >= state.introAnim.duration) {
+        state.introAnim = null;
+        state.mode = "playing";
+        state.pendingMouseX = 0;
+        state.pendingMouseY = 0;
+        state.idleTimer = 0;
+        for (const m of state.marbles) {
+          m.spawnFade = 0.28;
+          spawnParticles(m.x, m.y, m.colorType === "gold" ? "#fde047" : "#7dd3fc", 10, 105, 2.8, "sparkle");
         }
       }
       return;
@@ -3384,13 +3517,134 @@
     }
   }
 
+  function renderIntroMosaic() {
+    const anim = state.introAnim;
+    if (!anim) return;
+
+    if (anim.portrait !== state.isPortrait) {
+      anim.portrait = state.isPortrait;
+      captureIntroBoard();
+    }
+
+    const t = anim.elapsed;
+
+    // Tiefes Äther-Raster als Mosaik-Hintergrund
+    ctx.fillStyle = "#070914";
+    ctx.fillRect(0, 0, WORLD_W, WORLD_H);
+
+    ctx.strokeStyle = "rgba(125, 211, 252, 0.065)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = 0; x <= COLS; x++) {
+      ctx.moveTo(x * TILE + 0.5, 0);
+      ctx.lineTo(x * TILE + 0.5, WORLD_H);
+    }
+    for (let y = 0; y <= ROWS; y++) {
+      ctx.moveTo(0, y * TILE + 0.5);
+      ctx.lineTo(WORLD_W, y * TILE + 0.5);
+    }
+    ctx.stroke();
+
+    // Pass 1: Bereits eingerastete Mosaik-Spielsteine
+    for (const tile of anim.tiles) {
+      const endT = tile.delay + tile.dur;
+      if (t < endT) continue;
+      const sx = tile.tx * TILE;
+      const sy = tile.ty * TILE;
+      ctx.drawImage(introCanvas, sx, sy, TILE, TILE, sx, sy, TILE, TILE);
+
+      const lockAge = t - endT;
+      if (lockAge < 0.28) {
+        const flash = 1 - lockAge / 0.28;
+        ctx.save();
+        ctx.strokeStyle = `rgba(186, 230, 253, ${flash * 0.48})`;
+        ctx.lineWidth = 1.6;
+        ctx.strokeRect(sx + 1, sy + 1, TILE - 2, TILE - 2);
+        ctx.fillStyle = `rgba(125, 211, 252, ${flash * 0.14})`;
+        ctx.fillRect(sx, sy, TILE, TILE);
+        ctx.restore();
+      }
+    }
+
+    // Pass 2: Einschwebende Mosaik-Elemente (jeder Spielstein einzeln animiert)
+    for (const tile of anim.tiles) {
+      if (t <= tile.delay || t >= tile.delay + tile.dur) continue;
+      const u = (t - tile.delay) / tile.dur;
+      const ease = 1 - Math.pow(1 - u, 3);
+      const sx = tile.tx * TILE;
+      const sy = tile.ty * TILE;
+      const cx = sx + TILE * 0.5 + tile.ox * (1 - ease);
+      const cy = sy + TILE * 0.5 + tile.oy * (1 - ease);
+      const scale = tile.startScale + (1 - tile.startScale) * ease;
+      const rot = tile.rot * (1 - ease);
+      const alpha = Math.min(1, u * 2.1);
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.translate(cx, cy);
+      ctx.rotate(rot);
+      ctx.scale(scale, scale);
+      ctx.drawImage(introCanvas, sx, sy, TILE, TILE, -TILE * 0.5, -TILE * 0.5, TILE, TILE);
+
+      // Leuchtender Mosaik-Rand während des Einflugs
+      ctx.strokeStyle = `rgba(125, 211, 252, ${(1 - ease) * 0.72})`;
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(-TILE * 0.5 + 0.75, -TILE * 0.5 + 0.75, TILE - 1.5, TILE - 1.5);
+      ctx.restore();
+    }
+
+    // Pass 3: Im Finale (2.45s – 3.0s) Gravitationsfelder, Laser & Kugeln einblenden
+    const reveal = Math.max(0, Math.min(1, (t - 2.42) / 0.52));
+    if (reveal > 0) {
+      const revealEase = 1 - Math.pow(1 - reveal, 3);
+      ctx.save();
+      ctx.globalAlpha = revealEase;
+      drawGravityFields();
+      drawLaserBeams();
+      ctx.restore();
+
+      for (let i = 0; i < state.marbles.length; i++) {
+        const m = state.marbles[i];
+        ctx.save();
+        ctx.globalAlpha = revealEase;
+        ctx.translate(m.x, m.y);
+        const ms = 0.35 + 0.65 * revealEase;
+        ctx.scale(ms, ms);
+        ctx.translate(-m.x, -m.y);
+        drawSingleMarble(m, i === state.activeMarbleIdx);
+        ctx.restore();
+
+        if (reveal < 0.96) {
+          ctx.save();
+          ctx.strokeStyle = m.colorType === "gold"
+            ? `rgba(251, 191, 36, ${(1 - reveal) * 0.75})`
+            : `rgba(125, 211, 252, ${(1 - reveal) * 0.75})`;
+          ctx.lineWidth = 2.2;
+          ctx.beginPath();
+          ctx.arc(m.x, m.y, MARBLE_RADIUS + (1 - revealEase) * 28, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+    }
+
+    drawAmbientDust();
+  }
+
   function render() {
+    ctx = mainCtx;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     ctx.save();
     if (state.isPortrait) {
       ctx.translate(WORLD_H, 0);
       ctx.rotate(Math.PI / 2);
+    }
+
+    if (state.introAnim && (state.mode === "intro" || (state.mode === "paused" && state.resumeIntro))) {
+      renderIntroMosaic();
+      ctx.restore();
+      return;
     }
 
     for (let y = 0; y < ROWS; y++) {
@@ -3493,6 +3747,7 @@
     btnBackToEditor.classList.toggle("hidden", !fromEditor);
     loadLevelData(levelObj, false);
     audio.init();
+    beginLevelIntro();
     audio.playNewLevel();
     engagePointerLock();
   };
