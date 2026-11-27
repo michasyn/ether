@@ -100,8 +100,6 @@
   const shieldPill = document.getElementById("shieldPill");
   const hudShield = document.getElementById("hudShield");
   const livesOrbs = document.getElementById("livesOrbs");
-  const floorDot = document.getElementById("floorDot");
-  const floorLabel = document.getElementById("floorLabel");
   const sensSlider = document.getElementById("sensSlider");
   const sensValue = document.getElementById("sensValue");
   const btnLevels = document.getElementById("btnLevels");
@@ -118,9 +116,7 @@
   const btnSettings = document.getElementById("btnSettings");
   const settingsMenu = document.getElementById("settingsMenu");
   const btnSwitchOrb = document.getElementById("btnSwitchOrb");
-  const btnPickupLock = document.getElementById("btnPickupLock");
   const invSlotsWrap = document.getElementById("invSlots");
-  const btnUseItem = document.getElementById("btnUseItem");
   const holoBanner = document.getElementById("holoBanner");
   const holoText = document.getElementById("holoText");
 
@@ -165,7 +161,6 @@
     links: [],
     activeCharges: [],
     inventory: [],
-    pickupLocked: false,
     mouseHoldSuppress: false,
     holoTimer: 0,
     marbles: [],
@@ -988,33 +983,24 @@
     for (let i = 0; i < MAX_INVENTORY; i++) {
       const item = state.inventory[i];
       const slot = document.createElement("button");
+      slot.type = "button";
       slot.className = "inv-slot" + (i === 0 && item ? " active-slot" : "") + (!item ? " empty" : "");
       if (item) {
         const meta = ITEM_META[item.type];
         slot.textContent = meta.icon;
         slot.style.color = meta.color;
-        slot.title = `${meta.name} (Tippen zum Auswählen)`;
+        slot.title = `${meta.name} (Tippen zum Nutzen)`;
+        slot.setAttribute("aria-label", `${meta.name} nutzen`);
         slot.addEventListener("click", (e) => {
           e.stopPropagation();
-          selectInventoryIndex(i);
+          audio.init();
+          useInventoryItemAt(i);
         });
+      } else {
+        slot.disabled = true;
       }
       invSlotsWrap.appendChild(slot);
     }
-    btnUseItem.disabled = state.inventory.length === 0;
-    if (state.inventory.length > 0) {
-      const activeMeta = ITEM_META[state.inventory[0].type];
-      btnUseItem.textContent = `${activeMeta.icon} Nutzen`;
-    } else {
-      btnUseItem.textContent = "Aktivieren";
-    }
-  }
-
-  function selectInventoryIndex(idx) {
-    if (idx <= 0 || idx >= state.inventory.length) return;
-    const [chosen] = state.inventory.splice(idx, 1);
-    state.inventory.unshift(chosen);
-    renderInventoryUI();
   }
 
   function rotateInventory(dir = 1) {
@@ -1030,12 +1016,12 @@
     state.holoTimer = 6.5;
   }
 
-  function useActiveItem() {
+  function useInventoryItemAt(idx) {
     const m = getActiveMarble();
     if (state.mode !== "playing" || !m || !m.alive) return;
-    if (state.inventory.length === 0) return;
+    if (idx < 0 || idx >= state.inventory.length) return;
 
-    const item = state.inventory[0];
+    const item = state.inventory[idx];
     const pan = getPan(m.x, m.y);
 
     if (item.type === "shard") {
@@ -1045,7 +1031,7 @@
     }
 
     if (item.type === "shield") {
-      state.inventory.shift();
+      state.inventory.splice(idx, 1);
       m.shieldTimer = SHIELD_DURATION;
       audio.playShieldActivate(pan);
       spawnParticles(m.x, m.y, "#34d399", 18, 120, 3.2);
@@ -1056,11 +1042,15 @@
     if (item.type === "pulse") {
       const tx = Math.max(0, Math.min(COLS - 1, Math.floor(m.x / TILE)));
       const ty = Math.max(0, Math.min(ROWS - 1, Math.floor(m.y / TILE)));
-      state.inventory.shift();
+      state.inventory.splice(idx, 1);
       state.activeCharges.push({ tx, ty, timer: 1.4, maxTimer: 1.4 });
       audio.playPulseArm(pan);
       renderInventoryUI();
     }
+  }
+
+  function useActiveItem() {
+    useInventoryItemAt(0);
   }
 
   function detonateCharge(charge) {
@@ -1139,16 +1129,6 @@
       const span = document.createElement("span");
       span.className = "life-orb" + (i >= state.lives ? " empty" : "");
       livesOrbs.appendChild(span);
-    }
-
-    const fKey = m ? getFloorAt(m.x, m.y) : "standard";
-    const fp = FLOOR_PROPS[fKey] || FLOOR_PROPS.standard;
-    floorDot.style.background = fp.dot;
-    if (fKey === "red" && m && m.alive && m.rubySinkTimer > 0 && m.shieldTimer <= 0) {
-      const rem = Math.max(0, RUBY_SINK_DUR - m.rubySinkTimer);
-      floorLabel.textContent = `${fp.name} (${rem.toFixed(1)}s)`;
-    } else {
-      floorLabel.textContent = fp.name;
     }
   }
 
@@ -1415,17 +1395,6 @@
     }
   });
   sensSlider.addEventListener("input", (e) => setSensitivity(parseFloat(e.target.value)));
-
-  btnPickupLock.addEventListener("click", () => {
-    state.pickupLocked = !state.pickupLocked;
-    btnPickupLock.textContent = state.pickupLocked ? "🔒" : "🔓";
-    btnPickupLock.classList.toggle("locked", state.pickupLocked);
-  });
-
-  btnUseItem.addEventListener("click", () => {
-    audio.init();
-    useActiveItem();
-  });
 
   // =========================================================================
   // 9. PARTIKEL & SPIEL-EREIGNISSE
@@ -1902,7 +1871,7 @@
           audio.playExtraLife(getPan(m.x, m.y));
           spawnParticles((mTx + 0.5) * TILE, (mTy + 0.5) * TILE, "#7dd3fc", 22, 160, 3.6);
           showHoloMessage("Versteckte Äther-Kugel gefunden! (+1 Reserve-Kugel)");
-        } else if (!state.pickupLocked && !state.mouseHoldSuppress && state.inventory.length < MAX_INVENTORY) {
+        } else if (!state.mouseHoldSuppress && state.inventory.length < MAX_INVENTORY) {
           state.inventory.push(floorItem);
           state.items[mTy][mTx] = null;
           audio.playPickup(getPan(m.x, m.y));
