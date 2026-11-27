@@ -27,7 +27,7 @@
   const LASER_DEATH_DUR = 0.55;
   const RUBY_SINK_DUR = 4.0;
   const RUBY_DEATH_DUR = 0.55;
-  const MAX_INVENTORY = 5;
+  const MAX_INVENTORY = 7;
   const MAX_LIVES = 5;
   const GRAVITY_RADIUS = TILE * 3.6;
   const GRAVITY_STRENGTH = 500;
@@ -236,6 +236,16 @@
       state.pendingMouseX += sdx;
       state.pendingMouseY += sdy;
     }
+  }
+
+  function clientToWorld(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    const cx = ((clientX - rect.left) / rect.width) * canvas.width;
+    const cy = ((clientY - rect.top) / rect.height) * canvas.height;
+    if (state.isPortrait) {
+      return { x: cy, y: WORLD_H - cx };
+    }
+    return { x: cx, y: cy };
   }
 
   function shuffle(arr) {
@@ -682,13 +692,19 @@
     btnSwitchOrb.classList.toggle("gold", isGold);
   }
 
-  function switchActiveMarble() {
+  function selectActiveMarble(idx) {
     if (state.marbles.length < 2 || state.mode !== "playing") return;
-    state.activeMarbleIdx = (state.activeMarbleIdx + 1) % state.marbles.length;
+    if (idx < 0 || idx >= state.marbles.length || idx === state.activeMarbleIdx) return;
+    state.activeMarbleIdx = idx;
     const m = getActiveMarble();
     audio.playShardOpen(getPan(m.x, m.y));
-    spawnParticles(m.x, m.y, m.colorType === "gold" ? "#fbbf24" : "#38bdf8", 12, 95, 2.8);
+    spawnParticles(m.x, m.y, m.colorType === "gold" ? "#fbbf24" : "#38bdf8", 14, 105, 3.0);
     updateSwitchOrbButton();
+  }
+
+  function switchActiveMarble() {
+    if (state.marbles.length < 2 || state.mode !== "playing") return;
+    selectActiveMarble((state.activeMarbleIdx + 1) % state.marbles.length);
   }
 
   btnSwitchOrb.addEventListener("click", () => {
@@ -875,7 +891,14 @@
             spawnParticles((tx + 0.5) * TILE, (ty + 0.5) * TILE, "#38bdf8", 12, 110, 2.8);
           }
         } else if (target.type === "laser") {
+          const prev = target.active;
           target.active = (link.mode === "toggle") ? !target.active : Boolean(activeState);
+          if (target.active && !prev) {
+            const lx = (tx + 0.5) * TILE;
+            const ly = (ty + 0.5) * TILE;
+            audio.playLaserActivate(getPan(lx, ly));
+            spawnParticles(lx, ly, "#fb7185", 14, 125, 2.8);
+          }
         }
       }
     }
@@ -1139,6 +1162,11 @@
   }
 
   // Vollbild-Modus
+  function updateFullscreenIcon() {
+    const active = !!document.fullscreenElement;
+    btnFullscreen.classList.toggle("is-fullscreen", active);
+    btnFullscreen.setAttribute("aria-pressed", String(active));
+  }
   btnFullscreen.addEventListener("click", () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen?.().catch(() => {});
@@ -1146,6 +1174,7 @@
       document.exitFullscreen?.().catch(() => {});
     }
   });
+  document.addEventListener("fullscreenchange", updateFullscreenIcon);
 
   // Gyroskop / Neigungssteuerung
   function onDeviceOrientation(e) {
@@ -1231,6 +1260,7 @@
     if (state.mode !== "playing") return;
     state.mode = "paused";
     audio.updateSurfaceSound("standard", 0, 0, false);
+    audio.updateLaserSound(false, 0, 0);
     exitPointerLock();
     showOverlay(
       "Pausiert",
@@ -1311,6 +1341,26 @@
     state.isTouchDevice = true;
     audio.init();
     if (state.mode !== "playing") return;
+
+    // Im Dual-Modus: Kugel direkt durch Antippen auswählen
+    if (state.marbles.length >= 2) {
+      const worldPos = clientToWorld(e.clientX, e.clientY);
+      const hitRadius = MARBLE_RADIUS * 2.6;
+      let bestIdx = -1;
+      let bestDist = hitRadius;
+      state.marbles.forEach((m, idx) => {
+        if (!m.alive) return;
+        const d = Math.hypot(worldPos.x - m.x, worldPos.y - m.y);
+        if (d <= bestDist) {
+          bestDist = d;
+          bestIdx = idx;
+        }
+      });
+      if (bestIdx !== -1 && bestIdx !== state.activeMarbleIdx) {
+        selectActiveMarble(bestIdx);
+      }
+    }
+
     state.activeTouchId = e.pointerId;
     state.lastTouchX = e.clientX;
     state.lastTouchY = e.clientY;
@@ -1388,10 +1438,12 @@
   btnAudio.addEventListener("click", () => {
     audio.init();
     audio.muted = !audio.muted;
-    btnAudio.textContent = audio.muted ? "🔇" : "🔊";
+    btnAudio.classList.toggle("is-muted", audio.muted);
+    btnAudio.setAttribute("aria-pressed", String(audio.muted));
     if (audio.muted) {
       audio.stopJingles();
       audio.updateSurfaceSound("standard", 0, 0, false);
+      audio.updateLaserSound(false, 0, 0);
     }
   });
   sensSlider.addEventListener("input", (e) => setSensitivity(parseFloat(e.target.value)));
@@ -3045,6 +3097,21 @@
     if (m) {
       const spd = Math.hypot(m.vx, m.vy);
       audio.updateSurfaceSound(getFloorAt(m.x, m.y), spd, getPan(m.x, m.y), state.mode === "playing" && m.alive);
+    }
+
+    const laserActive = state.mode === "playing" && state.laserBeams.length > 0;
+    if (laserActive) {
+      let panSum = 0;
+      let activeCount = 0;
+      for (const l of state.lasers) {
+        if (l.active) {
+          panSum += getPan((l.x + 0.5) * TILE, (l.y + 0.5) * TILE);
+          activeCount++;
+        }
+      }
+      audio.updateLaserSound(true, activeCount > 0 ? panSum / activeCount : 0, state.laserBeams.length);
+    } else {
+      audio.updateLaserSound(false, 0, 0);
     }
 
     render();

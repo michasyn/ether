@@ -8,6 +8,7 @@
       this.muted = false;
       this.noiseBuffer = null;
       this.surfaceNodes = null;
+      this.laserNodes = null;
       this.jingles = {
         newLevel: new Audio("newlevel.mp3"),
         win:      new Audio("winlevel.mp3"),
@@ -133,6 +134,92 @@
         iceFilterMain, iceFilterEdge, iceGain,
         sandFilterBody, sandFilterGrit, sandGain
       };
+
+      // 3. Kontinuierlicher elektrischer Laser-Loop (Surren + Hochspannungs-Knistern)
+      const laserPanner = this.ctx.createStereoPanner ? this.ctx.createStereoPanner() : null;
+      const laserOut = laserPanner || this.ctx.destination;
+      if (laserPanner) laserPanner.connect(this.ctx.destination);
+
+      const laserMasterGain = this.ctx.createGain();
+      laserMasterGain.gain.value = 0;
+      laserMasterGain.connect(laserOut);
+
+      // Elektrisches Netz-/Plasma-Surren (110 Hz + 221.5 Hz für organisches Schweben)
+      const humFilter = this.ctx.createBiquadFilter();
+      humFilter.type = "lowpass";
+      humFilter.frequency.value = 1150;
+      humFilter.Q.value = 2.8;
+
+      const humGain = this.ctx.createGain();
+      humGain.gain.value = 0.65;
+      humFilter.connect(humGain);
+      humGain.connect(laserMasterGain);
+
+      const humOsc1 = this.ctx.createOscillator();
+      humOsc1.type = "sawtooth";
+      humOsc1.frequency.value = 110;
+      humOsc1.connect(humFilter);
+      humOsc1.start();
+
+      const humOsc2 = this.ctx.createOscillator();
+      humOsc2.type = "sawtooth";
+      humOsc2.frequency.value = 221.6;
+      const humOsc2Gain = this.ctx.createGain();
+      humOsc2Gain.gain.value = 0.55;
+      humOsc2.connect(humOsc2Gain);
+      humOsc2Gain.connect(humFilter);
+      humOsc2.start();
+
+      // Hochspannungs-Knistern / Plasma-Zischen (mit subtiler LFO-Modulation)
+      const sizzleSrc = this.ctx.createBufferSource();
+      sizzleSrc.buffer = this.noiseBuffer;
+      sizzleSrc.loop = true;
+
+      const sizzleFilter = this.ctx.createBiquadFilter();
+      sizzleFilter.type = "bandpass";
+      sizzleFilter.frequency.value = 2600;
+      sizzleFilter.Q.value = 3.2;
+
+      const sizzleGain = this.ctx.createGain();
+      sizzleGain.gain.value = 0.32;
+
+      const sizzleLfo = this.ctx.createOscillator();
+      sizzleLfo.type = "sine";
+      sizzleLfo.frequency.value = 18;
+      const sizzleLfoDepth = this.ctx.createGain();
+      sizzleLfoDepth.gain.value = 0.14;
+      sizzleLfo.connect(sizzleLfoDepth);
+      sizzleLfoDepth.connect(sizzleGain.gain);
+      sizzleLfo.start();
+
+      sizzleSrc.connect(sizzleFilter);
+      sizzleFilter.connect(sizzleGain);
+      sizzleGain.connect(laserMasterGain);
+      sizzleSrc.start();
+
+      this.laserNodes = {
+        panner: laserPanner,
+        masterGain: laserMasterGain,
+        humFilter
+      };
+    }
+
+    updateLaserSound(active, pan = 0, segCount = 1) {
+      if (!this.ctx || !this.laserNodes) return;
+      const now = this.ctx.currentTime;
+      const l = this.laserNodes;
+
+      if (l.panner) {
+        l.panner.pan.setTargetAtTime(Math.max(-0.75, Math.min(0.75, pan)), now, 0.06);
+      }
+
+      if (this.muted || !active) {
+        l.masterGain.gain.setTargetAtTime(0, now, 0.05);
+        return;
+      }
+
+      const boost = Math.min(0.035, Math.max(0, segCount - 1) * 0.01);
+      l.masterGain.gain.setTargetAtTime(0.085 + boost, now, 0.07);
     }
 
     updateSurfaceSound(floorType, speed, pan, active) {
@@ -419,6 +506,73 @@
       gain.connect(out);
       osc.start(now);
       osc.stop(now + 0.38);
+    }
+
+    playLaserActivate(pan) {
+      if (this.muted || !this.ctx) return;
+      const now = this.ctx.currentTime;
+      const out = this.createPanner(pan);
+
+      // 1. Elektrischer Funken-Impuls (Knister-Start)
+      if (this.noiseBuffer) {
+        const src = this.ctx.createBufferSource();
+        src.buffer = this.noiseBuffer;
+        const bp = this.ctx.createBiquadFilter();
+        bp.type = "bandpass";
+        bp.frequency.setValueAtTime(3600, now);
+        bp.frequency.exponentialRampToValueAtTime(1500, now + 0.18);
+        bp.Q.value = 2.6;
+        const nGain = this.ctx.createGain();
+        nGain.gain.setValueAtTime(0.001, now);
+        nGain.gain.linearRampToValueAtTime(0.28, now + 0.012);
+        nGain.gain.exponentialRampToValueAtTime(0.06, now + 0.065);
+        nGain.gain.linearRampToValueAtTime(0.2, now + 0.09);
+        nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+        src.connect(bp);
+        bp.connect(nGain);
+        nGain.connect(out);
+        src.start(now);
+        src.stop(now + 0.24);
+      }
+
+      // 2. Elektrisches Hochspannungs-Surren (2 verstimmte Sägezahn-Oszillatoren + resonanter Lowpass)
+      const buzzFilter = this.ctx.createBiquadFilter();
+      buzzFilter.type = "lowpass";
+      buzzFilter.frequency.setValueAtTime(1100, now);
+      buzzFilter.frequency.exponentialRampToValueAtTime(2400, now + 0.14);
+      buzzFilter.frequency.exponentialRampToValueAtTime(950, now + 0.36);
+      buzzFilter.Q.value = 2.4;
+
+      const buzzGain = this.ctx.createGain();
+      buzzGain.gain.setValueAtTime(0.001, now);
+      buzzGain.gain.linearRampToValueAtTime(0.2, now + 0.02);
+      buzzGain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+      buzzFilter.connect(buzzGain);
+      buzzGain.connect(out);
+
+      [145, 294].forEach((baseFreq) => {
+        const osc = this.ctx.createOscillator();
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(baseFreq, now);
+        osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.28, now + 0.14);
+        osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.1, now + 0.36);
+        osc.connect(buzzFilter);
+        osc.start(now);
+        osc.stop(now + 0.4);
+      });
+
+      // 3. Scharfer Zünd-Oberton
+      const ping = this.ctx.createOscillator();
+      const pingGain = this.ctx.createGain();
+      ping.type = "square";
+      ping.frequency.setValueAtTime(580, now);
+      ping.frequency.exponentialRampToValueAtTime(1420, now + 0.1);
+      pingGain.gain.setValueAtTime(0.09, now);
+      pingGain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+      ping.connect(pingGain);
+      pingGain.connect(out);
+      ping.start(now);
+      ping.stop(now + 0.15);
     }
 
     playShieldActivate(pan) {
